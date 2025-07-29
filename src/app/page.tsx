@@ -1,102 +1,131 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    // Periksa status login dari LocalStorage saat komponen dimuat di sisi klien
+    // Menggunakan !!localStorage.getItem('userId') untuk mengonversi nilai menjadi boolean
+    if (typeof window !== 'undefined') {
+      setIsLoggedIn(!!localStorage.getItem('userId')); // Cek keberadaan userId
+    }
+  }, []);
+
+  // Tentukan tujuan tombol "Mulai Ngobrol Sekarang!" berdasarkan status login
+  const chatButtonHref = isLoggedIn ? '/messages' : '/auth/login';
+
+  // Handler untuk logout dari Navbar Homepage
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('userId');
+      localStorage.removeItem('username');
+      localStorage.removeItem('basicAuthCredentials');
+    }
+    window.location.href = '/auth/login'; // Redirect manual setelah logout
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-inter text-gray-800">
+      {/* Navigation Bar */}
+      <nav className="bg-white shadow-lg py-4 px-6 md:px-12 flex justify-between items-center rounded-b-xl">
+        <div className="text-2xl font-extrabold text-blue-700">
+          BEM Chatting
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+        <div className="space-x-6">
+          <Link href="/" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
+            Beranda
+          </Link>
+          <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
+            Fitur
+          </Link>
+          <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
+            Tentang Kami
+          </Link>
+          {/* Tombol Masuk/Logout di Navbar */}
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105"
+            >
+              Logout
+            </button>
+          ) : (
+            <>
+              <Link href="/auth/login" passHref>
+                <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                  Masuk
+                </button>
+              </Link>
+              <Link href="/auth/register" passHref>
+                <button className="bg-gray-200 hover:bg-gray-300 text-blue-700 font-semibold py-2 px-5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                  Daftar
+                </button>
+              </Link>
+            </>
+          )}
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative flex items-center justify-center h-[calc(100vh-80px)] text-center px-6 md:px-12 overflow-hidden">
+        <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: '' }}></div>
+        <div className="relative z-10 max-w-4xl mx-auto">
+          <h1 className="text-6xl md:text-7xl font-extrabold leading-tight mb-6 text-blue-800 drop-shadow-lg">
+            BEM Chatting
+          </h1>
+          <p className="text-2xl md:text-3xl font-light leading-relaxed text-gray-700 mb-10">
+            adalah tempat ngobrol khusus buat anak-anak BEM — biar koordinasi kegiatan, rapat divisi, atau sekadar diskusi jadi makin lancar dan seru. ✌️
+          </p>
+          {/* Tombol yang mengarah ke halaman pesan atau login */}
+          <Link href={chatButtonHref} passHref>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-full shadow-xl transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 text-xl">
+              Mulai Ngobrol Sekarang!
+            </button>
+          </Link>
+        </div>
+      </section>
+
+      {/* Keunggulan Layanan (Features Section) */}
+      <section className="py-20 px-6 md:px-12 bg-white rounded-t-xl shadow-inner">
+        <h2 className="text-5xl font-extrabold text-center text-blue-800 mb-16">
+          Mengapa BEM Chatting?
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+          {/* Feature 1 */}
+          <div className="bg-blue-50 p-8 rounded-xl shadow-lg hover:shadow-2xl transition duration-300 transform hover:-translate-y-2">
+            <div className="text-5xl text-blue-600 mb-6 text-center">⚡</div> {/* Emoji for instant and fast */}
+            <h3 className="text-3xl font-bold text-gray-900 mb-4 text-center">Instan dan Cepat</h3>
+            <p className="text-lg text-gray-700 text-center">
+              Kirim pesan dan dapatkan balasan secepat kilat. Tidak ada lagi menunggu, semua informasi langsung sampai.
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="bg-blue-50 p-8 rounded-xl shadow-lg hover:shadow-2xl transition duration-300 transform hover:-translate-y-2">
+            <div className="text-5xl text-blue-600 mb-6 text-center">🤝</div> {/* Emoji for connected */}
+            <h3 className="text-3xl font-bold text-gray-900 mb-4 text-center">Terkoneksi Antar Sesama</h3>
+            <p className="text-lg text-gray-700 text-center">
+              Jalin komunikasi erat dengan seluruh anggota BEM. Diskusikan ide, koordinasi acara, semua dalam satu tempat.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="bg-blue-50 p-8 rounded-xl shadow-lg hover:shadow-2xl transition duration-300 transform hover:-translate-y-2">
+            <div className="text-5xl text-blue-600 mb-6 text-center">📚</div> {/* Emoji for sharing */}
+            <h3 className="text-3xl font-bold text-gray-900 mb-4 text-center">Sharing Materi Makin Seru!</h3>
+            <p className="text-lg text-gray-700 text-center">
+              Bagikan catatan kuliah, materi rapat, atau bahkan meme lucu dengan mudah. Kolaborasi jadi lebih asik!
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer (Optional, but good practice) */}
+      <footer className="py-8 bg-gray-800 text-white text-center text-sm">
+        <p>&copy; 2025 BEM Chatting. All rights reserved.</p>
       </footer>
     </div>
   );
