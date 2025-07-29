@@ -127,7 +127,7 @@ export default function MessagesPage() {
 
   // State untuk manajemen UI sidebar
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search' | 'suggestions'>('chats'); // Tambahkan 'suggestions'
+  const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search'>('chats'); // 'suggestions' tab dihapus dari sini
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -301,7 +301,6 @@ export default function MessagesPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        // Filter pesan yang dihapus secara lokal sudah dilakukan di backend
         setMessages(data);
       } else {
         setError(data.message || "Gagal memuat riwayat percakapan.");
@@ -347,11 +346,10 @@ export default function MessagesPage() {
       });
 
       if (response.ok) {
-        // Setelah berhasil di backend, muat ulang riwayat percakapan
-        fetchConversationHistory();
-        fetchFriends();
-        fetchMessageRequests();
-        fetchSuggestedUsers();
+        fetchConversationHistory(); // Muat ulang riwayat agar pesan yang dihapus tidak terlihat
+        fetchFriends(); // Perbarui daftar teman untuk mendapatkan pesan terakhir
+        fetchMessageRequests(); // Perbarui pesan permintaan jika perlu
+        fetchSuggestedUsers(); // Perbarui saran pengguna
         alert('Pesan berhasil dihapus untuk Anda.');
       } else {
         const errorData = await response.json();
@@ -386,12 +384,11 @@ export default function MessagesPage() {
 
       if (response.ok) {
         alert('Pesan berhasil dibatalkan pengiriman.');
-        // Muat ulang semua data yang relevan
         fetchFriends();
         fetchFriendRequests();
         fetchMessageRequests();
         fetchSuggestedUsers();
-        fetchConversationHistory();
+        fetchConversationHistory(); // Memuat ulang riwayat percakapan
       } else {
         const errorData = await response.json();
         alert(errorData.message || 'Gagal membatalkan pengiriman pesan.');
@@ -536,7 +533,7 @@ export default function MessagesPage() {
       }
     } else {
       setUsersFoundBySearch([]);
-      if (activeTab === 'search' && usersFoundBySearch.length === 0) {
+      if (activeTab === 'search') {
         setActiveTab('chats');
       }
     }
@@ -828,25 +825,25 @@ export default function MessagesPage() {
                     <div
                       key={user._id}
                       onClick={() => handleChatSelect(user, 'searchResult')}
-                      className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
+                      className={`flex items-center p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
                         selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : ""
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
+                      <div className="flex items-center gap-3 flex-grow min-w-0">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
                           {user.username.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium text-gray-800">{user.username}</span>
+                        <span className="font-medium text-gray-800 truncate">{user.username}</span>
                       </div>
                       {user._id !== currentUserId && !friends.some(f => f._id === user._id) && !outgoingFriendRequests.some(r => r.recipient._id === user._id) && !incomingFriendRequests.some(r => r.requester._id === user._id) ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(user.username); }}
-                          className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1 flex-shrink-0"
                         >
                           <UserPlus className="w-3 h-3" /> Tambah
                         </button>
                       ) : (
-                        <span className="text-sm text-gray-500 ml-auto">
+                        <span className="text-sm text-gray-500 ml-auto flex-shrink-0">
                           {user._id === currentUserId ? 'Anda' : (friends.some(f => f._id === user._id) ? 'Teman' : (outgoingFriendRequests.some(r => r.recipient._id === user._id) ? 'Pending' : (incomingFriendRequests.some(r => r.requester._id === user._id) ? 'Perlu Diterima' : '')))}
                         </span>
                       )}
@@ -1007,42 +1004,45 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          {/* Suggestions (will eventually be replaced by backend data or removed) */}
+          {/* Suggestions */}
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-800">Saran Pengguna</h2>
             </div>
             <div className="p-4 space-y-3">
-              {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada saran.</p>}
-              {suggestedUsers.length === 0 && searchTerm.length <= 2 && <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>}
-              {usersFoundBySearch.map((user) => (
-                <div
-                  key={user._id}
-                  onClick={() => handleChatSelect(user, 'searchResult')}
-                  className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
-                    selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
-                      {user.username.charAt(0).toUpperCase()}
+              {/* Logika tampilan saran pengguna yang diperbarui */}
+              {suggestedUsers.length === 0 ? ( // Selalu tampilkan pesan ini jika suggestedUsers kosong
+                <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>
+              ) : (
+                suggestedUsers.map((user) => (
+                  <div
+                    key={user._id}
+                    onClick={() => handleChatSelect(user, 'searchResult')} // Menggunakan searchResult karena ini adalah saran, bukan teman langsung
+                    className={`flex items-center p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
+                      selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 flex-grow min-w-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+                        {user.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium text-gray-800 truncate">{user.username}</span>
                     </div>
-                    <span className="font-medium text-gray-800">{user.username}</span>
+                    {user._id !== currentUserId && !friends.some(f => f._id === user._id) && !outgoingFriendRequests.some(r => r.recipient._id === user._id) && !incomingFriendRequests.some(r => r.requester._id === user._id) ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(user.username); }}
+                        className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1 flex-shrink-0"
+                      >
+                        <UserPlus className="w-3 h-3" /> Tambah
+                      </button>
+                    ) : (
+                      <span className="text-sm text-gray-500 ml-auto flex-shrink-0">
+                        {user._id === currentUserId ? 'Anda' : (friends.some(f => f._id === user._id) ? 'Teman' : (outgoingFriendRequests.some(r => r.recipient._id === user._id) ? 'Pending' : (incomingFriendRequests.some(r => r.requester._id === user._id) ? 'Perlu Diterima' : '')))}
+                      </span>
+                    )}
                   </div>
-                  {user._id !== currentUserId && !friends.some(f => f._id === user._id) && !outgoingFriendRequests.some(r => r.recipient._id === user._id) && !incomingFriendRequests.some(r => r.requester._id === user._id) ? (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(user.username); }}
-                      className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1"
-                    >
-                      <UserPlus className="w-3 h-3" /> Tambah
-                    </button>
-                  ) : (
-                    <span className="text-sm text-gray-500 ml-auto">
-                      {user._id === currentUserId ? 'Anda' : (friends.some(f => f._id === user._id) ? 'Teman' : (outgoingFriendRequests.some(r => r.recipient._id === user._id) ? 'Pending' : (incomingFriendRequests.some(r => r.requester._id === user._id) ? 'Perlu Diterima' : '')))}
-                    </span>
-                  )}
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

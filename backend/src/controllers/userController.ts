@@ -1,3 +1,4 @@
+// backend/src/controllers/userController.ts
 import { Request, Response } from 'express';
 import User, { IUser } from '../models/User';
 import Friendship, { IFriendship } from '../models/Friendship';
@@ -246,29 +247,27 @@ export const getSuggestions = async (req: AuthenticatedRequest, res: Response) =
     let suggestedUsers: IUser[] = [];
 
     if (currentUser.friends.length > 0) { // Jika pengguna memiliki teman
-      // Temukan teman dari teman
+      // 1. Temukan teman dari teman
       const friendsOfFriends = await User.find({
         _id: { $nin: friendIds }, // Kecualikan diri sendiri dan teman langsung
         friends: { $in: currentUser.friends.map(f => f._id) } // Teman yang memiliki teman dari pengguna saat ini
-      }).select('username _id');
+      }).select('username _id friends'); // Ambil juga daftar teman mereka untuk menghitung teman bersama
 
-      // Hitung teman bersama dan prioritaskan
+      // 2. Hitung teman bersama dan prioritaskan
       const suggestedWithMutualCount = [];
       for (const fof of friendsOfFriends) {
-        const fofFriends = await User.findById(fof._id).select('friends');
-        if (fofFriends) {
-          const commonFriends = fofFriends.friends.filter(fofFriendId =>
-            currentUser.friends.some(friendId => friendId._id.equals(fofFriendId))
-          );
-          suggestedWithMutualCount.push({ user: fof, mutualCount: commonFriends.length });
-        }
+        // Pastikan fof.friends adalah array dan mengandung ObjectId
+        const commonFriends = fof.friends.filter(fofFriendId =>
+          currentUser.friends.some(friendId => friendId._id.equals(fofFriendId as Types.ObjectId))
+        );
+        suggestedWithMutualCount.push({ user: fof, mutualCount: commonFriends.length });
       }
 
       // Urutkan berdasarkan jumlah teman bersama (tertinggi di atas)
       suggestedWithMutualCount.sort((a, b) => b.mutualCount - a.mutualCount);
       suggestedUsers = suggestedWithMutualCount.map(item => item.user);
 
-      // Jika saran masih kurang, tambahkan pengguna lain
+      // 3. Jika saran masih kurang, tambahkan pengguna lain yang belum berteman/pending
       if (suggestedUsers.length < 10) { // Targetkan hingga 10 saran
         const existingUserIds = new Set([...friendIds.map(id => id.toString()), ...suggestedUsers.map(u => u._id.toString())]);
         const otherUsers = await User.find({
@@ -277,10 +276,8 @@ export const getSuggestions = async (req: AuthenticatedRequest, res: Response) =
         suggestedUsers = [...suggestedUsers, ...otherUsers];
       }
 
-    } else { // Jika pengguna belum punya teman, tampilkan pengguna lain
-      suggestedUsers = await User.find({
-        _id: { $ne: userId } // Kecualikan diri sendiri
-      }).select('username _id').limit(10); // Batasi jumlah saran umum
+    } else { // Jika pengguna belum punya teman, kembalikan array kosong
+      suggestedUsers = []; // Mengembalikan array kosong
     }
 
     // Filter pengguna yang sudah memiliki permintaan pertemanan pending (keluar atau masuk)
