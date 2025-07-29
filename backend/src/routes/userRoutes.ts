@@ -6,7 +6,8 @@ import {
   acceptFriendRequest,
   rejectFriendRequest,
   getFriends,
-  getPendingFriendRequests
+  getPendingFriendRequests,
+  getSuggestions // Import getSuggestions
 } from '../controllers/userController';
 
 const router = Router();
@@ -20,5 +21,6 @@ router.put('/friend-request/:friendshipId/accept', acceptFriendRequest); // Mene
 router.put('/friend-request/:friendshipId/reject', rejectFriendRequest); // Menolak permintaan pertemanan
 router.get('/friends', getFriends); // Mendapatkan daftar teman
 router.get('/friend-requests/pending', getPendingFriendRequests); // Mendapatkan permintaan pertemanan pending
+router.get('/suggestions', getSuggestions); // Rute baru untuk saran pengguna
 
 export default router;

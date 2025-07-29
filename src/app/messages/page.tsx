@@ -24,12 +24,12 @@ const Message: React.FC<{ msg: MessageProps; currentUserId: string }> = ({ msg, 
       <div
         className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
           isMe
-            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white" // Diubah dari purple ke blue
+            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
             : "bg-white text-gray-800 border border-gray-100"
         }`}
       >
         <p className="text-sm">{msg.content}</p>
-        <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>{formattedTime}</p> {/* Diubah dari purple ke blue */}
+        <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>{formattedTime}</p>
       </div>
     </div>
   )
@@ -66,11 +66,12 @@ export default function MessagesPage() {
   const [error, setError] = useState<string | null>(null)
 
   // State baru untuk data dari backend
-  const [friends, setFriends] = useState<FriendWithLastMessage[]>([]); // Menggunakan FriendWithLastMessage
+  const [friends, setFriends] = useState<FriendWithLastMessage[]>([]);
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<FriendshipRequest[]>([]);
   const [outgoingFriendRequests, setOutgoingFriendRequests] = useState<FriendshipRequest[]>([]);
   const [usersFoundBySearch, setUsersFoundBySearch] = useState<UserData[]>([]);
   const [messageRequests, setMessageRequests] = useState<MessageProps[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<UserData[]>([]); // State baru untuk saran pengguna
 
   // State untuk manajemen UI sidebar
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -135,8 +136,7 @@ export default function MessagesPage() {
         );
         setFriends(friendsWithMessages);
       } else {
-        const errorData = await response.json(); // Ambil data error jika response tidak ok
-        // Periksa apakah errorData adalah objek dan memiliki properti message
+        const errorData = await response.json();
         if (typeof errorData === 'object' && errorData !== null && 'message' in errorData) {
           console.error('Gagal memuat teman:', (errorData as { message: string }).message);
         } else {
@@ -161,7 +161,6 @@ export default function MessagesPage() {
         setIncomingFriendRequests(data.incoming);
         setOutgoingFriendRequests(data.outgoing);
       } else {
-        // Periksa apakah data memiliki properti message
         if (typeof data === 'object' && data !== null && 'message' in data) {
           console.error('Gagal memuat permintaan pertemanan:', (data as { message: string }).message);
         } else {
@@ -185,7 +184,6 @@ export default function MessagesPage() {
       if (response.ok) {
         setMessageRequests(data);
       } else {
-        // Periksa apakah data memiliki properti message
         if (typeof data === 'object' && data !== null && 'message' in data) {
           console.error('Gagal memuat pesan permintaan:', (data as { message: string }).message);
         } else {
@@ -197,15 +195,39 @@ export default function MessagesPage() {
     }
   }, [currentUserId, getAuthHeader]);
 
+  // Fungsi untuk mengambil saran pengguna
+  const fetchSuggestedUsers = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      const authHeader = getAuthHeader();
+      const response = await fetch('http://localhost:5001/api/users/suggestions', {
+        headers: { Authorization: authHeader }
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSuggestedUsers(data);
+      } else {
+        if (typeof data === 'object' && data !== null && 'message' in data) {
+          console.error('Gagal memuat saran pengguna:', (data as { message: string }).message);
+        } else {
+          console.error('Gagal memuat saran pengguna: Unknown error format', data);
+        }
+      }
+    } catch (error: unknown) {
+      console.error('Kesalahan jaringan saat memuat saran pengguna:', error);
+    }
+  }, [currentUserId, getAuthHeader]);
 
-  // Efek untuk memuat data awal (teman, permintaan, pesan permintaan)
+
+  // Efek untuk memuat data awal (teman, permintaan, pesan permintaan, saran)
   useEffect(() => {
     if (currentUserId) {
       fetchFriends();
       fetchFriendRequests();
       fetchMessageRequests();
+      fetchSuggestedUsers(); // Panggil fungsi baru
     }
-  }, [currentUserId, fetchFriends, fetchFriendRequests, fetchMessageRequests]);
+  }, [currentUserId, fetchFriends, fetchFriendRequests, fetchMessageRequests, fetchSuggestedUsers]);
 
 
   // Efek untuk memuat pesan ketika selectedChatUser berubah
@@ -310,6 +332,7 @@ export default function MessagesPage() {
         fetchFriends(); // Perbarui daftar teman untuk mendapatkan pesan terakhir
         fetchFriendRequests();
         fetchMessageRequests();
+        fetchSuggestedUsers(); // Perbarui saran pengguna
 
         // Muat ulang riwayat percakapan setelah penundaan singkat
         setTimeout(() => {
@@ -370,7 +393,6 @@ export default function MessagesPage() {
           setUsersFoundBySearch(data);
           setActiveTab('search');
         } else {
-          // Periksa apakah data memiliki properti message
           if (typeof data === 'object' && data !== null && 'message' in data) {
             console.error('Gagal mencari pengguna:', (data as { message: string }).message);
           } else {
@@ -407,6 +429,7 @@ export default function MessagesPage() {
       if (response.ok) {
         alert(data.message);
         fetchFriendRequests();
+        fetchSuggestedUsers(); // Perbarui saran setelah mengirim permintaan
       } else {
         alert(data.message || 'Gagal mengirim permintaan pertemanan.');
       }
@@ -429,6 +452,7 @@ export default function MessagesPage() {
         alert(data.message);
         fetchFriendRequests();
         fetchFriends();
+        fetchSuggestedUsers(); // Perbarui saran setelah menerima permintaan
       } else {
         alert(data.message || 'Gagal menerima permintaan pertemanan.');
       }
@@ -450,6 +474,7 @@ export default function MessagesPage() {
       if (response.ok) {
         alert(data.message);
         fetchFriendRequests();
+        fetchSuggestedUsers(); // Perbarui saran setelah menolak permintaan
       } else {
         alert(data.message || 'Gagal menolak permintaan pertemanan.');
       }
@@ -462,9 +487,9 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-500"> {/* Changed gradient */}
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-500">
         <div className="bg-white rounded-2xl p-8 shadow-2xl">
-          <p className="text-xl text-blue-600 font-semibold">Memuat...</p> {/* Changed text color */}
+          <p className="text-xl text-blue-600 font-semibold">Memuat...</p>
         </div>
       </div>
     )
@@ -475,15 +500,15 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4"> {/* Changed background gradient */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto h-screen flex gap-4">
         {/* Left Sidebar - Contacts, Search, Requests */}
         <div className="w-80 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
           {/* Header */}
           <div className="p-6 border-b border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-gray-800">BEM Chatting</h1> {/* Changed Chat ONN */}
-              <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors"> {/* Changed text color */}
+              <h1 className="text-2xl font-bold text-gray-800">BEM Chatting</h1>
+              <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors">
                 <span className="text-sm font-medium">← Beranda</span>
               </Link>
             </div>
@@ -493,8 +518,8 @@ export default function MessagesPage() {
           {/* Navigation Icons */}
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center"> {/* Changed background color */}
-                <Users className="w-5 h-5 text-blue-600" /> {/* Changed text color */}
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
               </div>
               <Phone className="w-5 h-5 text-gray-400" />
               <Video className="w-5 h-5 text-gray-400" />
@@ -515,7 +540,7 @@ export default function MessagesPage() {
                 placeholder="Cari pengguna atau chat..."
                 value={searchTerm}
                 onChange={handleSearch}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-900 placeholder-gray-600" // Changed focus ring
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-900 placeholder-gray-600"
               />
             </div>
           </div>
@@ -524,7 +549,7 @@ export default function MessagesPage() {
           <div className="flex border-b border-gray-100">
             <button
               className={`flex-1 py-3 text-center font-medium ${
-                activeTab === 'chats' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500' // Changed text/border color
+                activeTab === 'chats' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'
               }`}
               onClick={() => { setActiveTab('chats'); setSearchTerm(''); setUsersFoundBySearch([]); }}
             >
@@ -532,7 +557,7 @@ export default function MessagesPage() {
             </button>
             <button
               className={`flex-1 py-3 text-center font-medium relative ${
-                activeTab === 'requests' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500' // Changed text/border color
+                activeTab === 'requests' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'
               }`}
               onClick={() => { setActiveTab('requests'); setSearchTerm(''); setUsersFoundBySearch([]); }}
             >
@@ -559,12 +584,12 @@ export default function MessagesPage() {
                       key={friend._id}
                       onClick={() => handleChatSelect(friend, 'friends')}
                       className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
-                        selectedChatUser?._id === friend._id ? "bg-blue-50 border border-blue-200" : "" // Changed background/border color
+                        selectedChatUser?._id === friend._id ? "bg-blue-50 border border-blue-200" : ""
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg"> {/* Changed gradient */}
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg">
                             {friend.username.charAt(0).toUpperCase()}
                           </div>
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div> {/* Online status mock */}
@@ -598,9 +623,9 @@ export default function MessagesPage() {
                 <div className="space-y-3 mb-6">
                   {incomingFriendRequests.length === 0 && <p className="text-gray-500 text-sm">Tidak ada permintaan pertemanan masuk.</p>}
                   {incomingFriendRequests.map((req) => (
-                    <div key={req._id} className="flex items-center justify-between p-3 bg-blue-50 rounded-xl"> {/* Kept blue-50 for friend requests */}
+                    <div key={req._id} className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm"> {/* Changed gradient */}
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
                           {req.requester.username.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-medium text-gray-800">{req.requester.username}</span>
@@ -633,12 +658,12 @@ export default function MessagesPage() {
                       key={msgReq._id}
                       onClick={() => handleChatSelect(msgReq.sender, 'messageRequests')}
                       className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
-                        selectedChatUser?._id === msgReq.sender._id ? "bg-blue-50 border border-blue-200" : "" // Changed background/border color
+                        selectedChatUser?._id === msgReq.sender._id ? "bg-blue-50 border border-blue-200" : ""
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg"> {/* Changed gradient */}
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg">
                             {msgReq.sender.username.charAt(0).toUpperCase()}
                           </div>
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
@@ -658,7 +683,7 @@ export default function MessagesPage() {
                   {outgoingFriendRequests.map((req) => (
                     <div key={req._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm"> {/* Changed gradient */}
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
                           {req.recipient.username.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-medium text-gray-800">{req.recipient.username}</span>
@@ -680,11 +705,11 @@ export default function MessagesPage() {
                       key={user._id}
                       onClick={() => handleChatSelect(user, 'searchResult')}
                       className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
-                        selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : "" // Changed background/border color
+                        selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : ""
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg"> {/* Changed gradient */}
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
                           {user.username.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-medium text-gray-800">{user.username}</span>
@@ -692,7 +717,7 @@ export default function MessagesPage() {
                       {user._id !== currentUserId && !friends.some(f => f._id === user._id) && !outgoingFriendRequests.some(r => r.recipient._id === user._id) && !incomingFriendRequests.some(r => r.requester._id === user._id) ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(user.username); }}
-                          className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1" // Changed button color
+                          className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1"
                         >
                           <UserPlus className="w-3 h-3" /> Tambah
                         </button>
@@ -716,7 +741,7 @@ export default function MessagesPage() {
             <div className="p-6 border-b border-gray-100 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg"> {/* Changed gradient */}
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg">
                     {selectedChatUser.username.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -725,9 +750,9 @@ export default function MessagesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Phone className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600" /> {/* Changed hover color */}
-                  <Video className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600" /> {/* Changed hover color */}
-                  <MoreHorizontal className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600" /> {/* Changed hover color */}
+                  <Phone className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600" />
+                  <Video className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600" />
+                  <MoreHorizontal className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600" />
                 </div>
               </div>
             </div>
@@ -739,11 +764,18 @@ export default function MessagesPage() {
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            {/* Error handling for messages */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <p className="text-red-600 text-center">{error}</p>
+              </div>
+            )}
+
             {!selectedChatUser ? (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"> {/* Changed background color */}
-                    <Users className="w-10 h-10 text-blue-600" /> {/* Changed text color */}
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-10 h-10 text-blue-600" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">Pilih kontak untuk memulai chat</h3>
                   <p className="text-gray-500">Pilih dari daftar teman atau hasil pencarian di sebelah kiri untuk memulai percakapan</p>
@@ -751,11 +783,6 @@ export default function MessagesPage() {
               </div>
             ) : (
               <>
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-                    <p className="text-red-600 text-center">{error}</p>
-                  </div>
-                )}
                 {messages.length === 0 && !error && (
                   <div className="text-center py-8">
                     <p className="text-gray-500">Belum ada pesan dengan {selectedChatUser.username}</p>
@@ -780,12 +807,12 @@ export default function MessagesPage() {
                     value={newMessageContent}
                     onChange={(e) => setNewMessageContent(e.target.value)}
                     placeholder="Ketik pesan Anda di sini..."
-                    className="w-full px-4 py-3 bg-gray-50 rounded-2xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all pr-12 text-gray-900 placeholder-gray-600" // Changed focus ring
+                    className="w-full px-4 py-3 bg-gray-50 rounded-2xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all pr-12 text-gray-900 placeholder-gray-600"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg" // Changed gradient
+                  className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -800,7 +827,7 @@ export default function MessagesPage() {
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-blue-600" /> {/* Changed text color */}
+                <Bell className="w-5 h-5 text-blue-600" />
                 <h2 className="text-lg font-semibold text-gray-800">Notifikasi</h2>
               </div>
             </div>
@@ -810,7 +837,7 @@ export default function MessagesPage() {
               )}
               {incomingFriendRequests.map((req) => (
                 <div key={req._id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl transition-colors">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0"> {/* Changed gradient */}
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
                     {req.requester.username.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -842,10 +869,15 @@ export default function MessagesPage() {
                   onClick={() => handleChatSelect(msgReq.sender, 'messageRequests')}
                   className="flex items-start gap-3 p-3 bg-yellow-50 rounded-xl cursor-pointer transition-colors"
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0"> {/* Changed gradient */}
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
                     {msgReq.sender.username.charAt(0).toUpperCase()}
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800">
+                      <span className="font-semibold">{msgReq.sender.username}</span> mengirim pesan permintaan: &quot;{msgReq.content}&quot;
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{new Date(msgReq.timestamp).toLocaleString()}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -858,16 +890,17 @@ export default function MessagesPage() {
             </div>
             <div className="p-4 space-y-3">
               {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada saran.</p>}
-              {usersFoundBySearch.map((user) => (
+              {suggestedUsers.length === 0 && searchTerm.length <= 2 && <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>}
+              {suggestedUsers.map((user) => (
                 <div
                   key={user._id}
                   onClick={() => handleChatSelect(user, 'searchResult')}
                   className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
-                    selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : "" // Changed background/border color
+                    selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm"> {/* Changed gradient */}
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
                       {user.username.charAt(0).toUpperCase()}
                     </div>
                     <span className="font-medium text-gray-800">{user.username}</span>
@@ -875,7 +908,7 @@ export default function MessagesPage() {
                   {user._id !== currentUserId && !friends.some(f => f._id === user._id) && !outgoingFriendRequests.some(r => r.recipient._id === user._id) && !incomingFriendRequests.some(r => r.requester._id === user._id) ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleSendFriendRequest(user.username); }}
-                      className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1" // Changed button color
+                      className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-full hover:bg-blue-700 transition-colors flex items-center gap-1"
                     >
                       <UserPlus className="w-3 h-3" /> Tambah
                     </button>

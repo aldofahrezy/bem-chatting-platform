@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import User, { IUser } from '../models/User';
 import Friendship, { IFriendship } from '../models/Friendship';
-import { Types } from 'mongoose'; // Import Types from mongoose
+import { Types } from 'mongoose';
 
 // Untuk mendapatkan ID pengguna dari request setelah otentikasi
 interface AuthenticatedRequest extends Request {
@@ -50,8 +50,7 @@ export const sendFriendRequest = async (req: AuthenticatedRequest, res: Response
       return res.status(404).json({ message: 'Pengguna penerima tidak ditemukan.' });
     }
 
-    // Pastikan requesterId dan recipientUser._id adalah ObjectId sebelum membandingkan
-    if (requesterId.equals(recipientUser._id as Types.ObjectId)) { // Type assertion here
+    if (requesterId.equals(recipientUser._id as Types.ObjectId)) {
       return res.status(400).json({ message: 'Tidak bisa mengirim permintaan pertemanan ke diri sendiri.' });
     }
 
@@ -107,7 +106,7 @@ export const acceptFriendRequest = async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ message: 'Permintaan pertemanan tidak ditemukan.' });
     }
 
-    if (!friendship.recipient.equals(userId as Types.ObjectId)) { // Type assertion here
+    if (!friendship.recipient.equals(userId as Types.ObjectId)) {
       return res.status(403).json({ message: 'Anda tidak diizinkan untuk menerima permintaan ini.' });
     }
 
@@ -119,9 +118,8 @@ export const acceptFriendRequest = async (req: AuthenticatedRequest, res: Respon
     await friendship.save();
 
     // Tambahkan kedua pengguna ke daftar teman masing-masing
-    // Pastikan ID yang digunakan adalah ObjectId
-    await User.findByIdAndUpdate(friendship.requester as Types.ObjectId, { $addToSet: { friends: friendship.recipient as Types.ObjectId } });
-    await User.findByIdAndUpdate(friendship.recipient as Types.ObjectId, { $addToSet: { friends: friendship.requester as Types.ObjectId } });
+    await User.findByIdAndUpdate(friendship.requester, { $addToSet: { friends: friendship.recipient } });
+    await User.findByIdAndUpdate(friendship.recipient, { $addToSet: { friends: friendship.requester } });
 
     res.status(200).json({ message: 'Permintaan pertemanan diterima.', friendship });
   } catch (err: unknown) {
@@ -150,7 +148,7 @@ export const rejectFriendRequest = async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ message: 'Permintaan pertemanan tidak ditemukan.' });
     }
 
-    if (!friendship.recipient.equals(userId as Types.ObjectId)) { // Type assertion here
+    if (!friendship.recipient.equals(userId as Types.ObjectId)) {
       return res.status(403).json({ message: 'Anda tidak diizinkan untuk menolak permintaan ini.' });
     }
 
@@ -223,6 +221,92 @@ export const getPendingFriendRequests = async (req: AuthenticatedRequest, res: R
       res.status(500).json({ message: 'Kesalahan server saat mendapatkan permintaan pertemanan pending: ' + err.message });
     } else {
       res.status(500).json({ message: 'Kesalahan server saat mendapatkan permintaan pertemanan pending: An unknown error occurred.' });
+    }
+  }
+};
+
+// Mendapatkan saran pengguna (teman dari teman atau pengguna lain)
+export const getSuggestions = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?._id;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Pengguna tidak terotentikasi.' });
+  }
+
+  try {
+    const currentUser = await User.findById(userId).populate('friends', '_id'); // Hanya perlu ID teman
+
+    if (!currentUser) {
+      return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+    }
+
+    const friendIds = currentUser.friends.map(friend => friend._id);
+    friendIds.push(userId); // Tambahkan ID pengguna saat ini untuk mengecualikan diri sendiri
+
+    let suggestedUsers: IUser[] = [];
+
+    if (friendIds.length > 1) { // Jika pengguna memiliki teman (friendIds akan berisi setidaknya ID pengguna itu sendiri)
+      // Temukan teman dari teman
+      const friendsOfFriends = await User.find({
+        _id: { $nin: friendIds }, // Kecualikan diri sendiri dan teman langsung
+        friends: { $in: friendIds.filter(id => !id.equals(userId)) } // Teman yang memiliki teman dari pengguna saat ini
+      }).select('username _id');
+
+      // Prioritaskan berdasarkan jumlah teman bersama
+      const mutualFriendsCount: { [key: string]: number } = {};
+      for (const fof of friendsOfFriends) {
+        const fofFriends = await User.findById(fof._id).select('friends');
+        if (fofFriends) {
+          const commonFriends = fofFriends.friends.filter(fofFriendId =>
+            friendIds.some(friendId => friendId.equals(fofFriendId))
+          );
+          mutualFriendsCount[fof._id.toString()] = commonFriends.length;
+        }
+      }
+
+      suggestedUsers = friendsOfFriends.sort((a, b) => {
+        return mutualFriendsCount[b._id.toString()] - mutualFriendsCount[a._id.toString()];
+      });
+
+      // Jika tidak ada teman dari teman, atau terlalu sedikit, ambil pengguna lain
+      if (suggestedUsers.length < 5) { // Ambil beberapa saran tambahan jika kurang
+        const otherUsers = await User.find({
+          _id: { $nin: [...friendIds, ...suggestedUsers.map(u => u._id)] } // Kecualikan yang sudah ada
+        }).select('username _id').limit(5 - suggestedUsers.length); // Batasi jumlah
+        suggestedUsers = [...suggestedUsers, ...otherUsers];
+      }
+
+    } else { // Jika pengguna belum punya teman
+      suggestedUsers = await User.find({
+        _id: { $ne: userId } // Kecualikan diri sendiri
+      }).select('username _id').limit(10); // Batasi jumlah saran umum
+    }
+
+    // Filter pengguna yang sudah memiliki permintaan pertemanan pending (keluar atau masuk)
+    const pendingFriendships = await Friendship.find({
+        $or: [
+            { requester: userId },
+            { recipient: userId }
+        ],
+        status: 'pending'
+    }).select('requester recipient');
+
+    const pendingUserIds = new Set<string>();
+    pendingFriendships.forEach(fs => {
+        pendingUserIds.add(fs.requester.toString());
+        pendingUserIds.add(fs.recipient.toString());
+    });
+
+    const finalSuggestions = suggestedUsers.filter(user => !pendingUserIds.has(user._id.toString()));
+
+
+    res.status(200).json(finalSuggestions);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.error('Kesalahan mendapatkan saran pengguna:', err);
+      res.status(500).json({ message: 'Kesalahan server saat mendapatkan saran pengguna: ' + err.message });
+    } else {
+      res.status(500).json({ message: 'Kesalahan server saat mendapatkan saran pengguna: An unknown error occurred.' });
     }
   }
 };
