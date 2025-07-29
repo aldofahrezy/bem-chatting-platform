@@ -241,42 +241,43 @@ export const getSuggestions = async (req: AuthenticatedRequest, res: Response) =
     }
 
     const friendIds = currentUser.friends.map(friend => friend._id);
-    friendIds.push(userId); // Tambahkan ID pengguna saat ini untuk mengecualikan diri sendiri
+    friendIds.push(userId as Types.ObjectId); // Tambahkan ID pengguna saat ini untuk mengecualikan diri sendiri
 
     let suggestedUsers: IUser[] = [];
 
-    if (friendIds.length > 1) { // Jika pengguna memiliki teman (friendIds akan berisi setidaknya ID pengguna itu sendiri)
+    if (currentUser.friends.length > 0) { // Jika pengguna memiliki teman
       // Temukan teman dari teman
       const friendsOfFriends = await User.find({
         _id: { $nin: friendIds }, // Kecualikan diri sendiri dan teman langsung
-        friends: { $in: friendIds.filter(id => !id.equals(userId)) } // Teman yang memiliki teman dari pengguna saat ini
+        friends: { $in: currentUser.friends.map(f => f._id) } // Teman yang memiliki teman dari pengguna saat ini
       }).select('username _id');
 
-      // Prioritaskan berdasarkan jumlah teman bersama
-      const mutualFriendsCount: { [key: string]: number } = {};
+      // Hitung teman bersama dan prioritaskan
+      const suggestedWithMutualCount = [];
       for (const fof of friendsOfFriends) {
         const fofFriends = await User.findById(fof._id).select('friends');
         if (fofFriends) {
           const commonFriends = fofFriends.friends.filter(fofFriendId =>
-            friendIds.some(friendId => friendId.equals(fofFriendId))
+            currentUser.friends.some(friendId => friendId._id.equals(fofFriendId))
           );
-          mutualFriendsCount[fof._id.toString()] = commonFriends.length;
+          suggestedWithMutualCount.push({ user: fof, mutualCount: commonFriends.length });
         }
       }
 
-      suggestedUsers = friendsOfFriends.sort((a, b) => {
-        return mutualFriendsCount[b._id.toString()] - mutualFriendsCount[a._id.toString()];
-      });
+      // Urutkan berdasarkan jumlah teman bersama (tertinggi di atas)
+      suggestedWithMutualCount.sort((a, b) => b.mutualCount - a.mutualCount);
+      suggestedUsers = suggestedWithMutualCount.map(item => item.user);
 
-      // Jika tidak ada teman dari teman, atau terlalu sedikit, ambil pengguna lain
-      if (suggestedUsers.length < 5) { // Ambil beberapa saran tambahan jika kurang
+      // Jika saran masih kurang, tambahkan pengguna lain
+      if (suggestedUsers.length < 10) { // Targetkan hingga 10 saran
+        const existingUserIds = new Set([...friendIds.map(id => id.toString()), ...suggestedUsers.map(u => u._id.toString())]);
         const otherUsers = await User.find({
-          _id: { $nin: [...friendIds, ...suggestedUsers.map(u => u._id)] } // Kecualikan yang sudah ada
-        }).select('username _id').limit(5 - suggestedUsers.length); // Batasi jumlah
+          _id: { $nin: Array.from(existingUserIds) } // Kecualikan yang sudah ada
+        }).select('username _id').limit(10 - suggestedUsers.length);
         suggestedUsers = [...suggestedUsers, ...otherUsers];
       }
 
-    } else { // Jika pengguna belum punya teman
+    } else { // Jika pengguna belum punya teman, tampilkan pengguna lain
       suggestedUsers = await User.find({
         _id: { $ne: userId } // Kecualikan diri sendiri
       }).select('username _id').limit(10); // Batasi jumlah saran umum
@@ -298,7 +299,6 @@ export const getSuggestions = async (req: AuthenticatedRequest, res: Response) =
     });
 
     const finalSuggestions = suggestedUsers.filter(user => !pendingUserIds.has(user._id.toString()));
-
 
     res.status(200).json(finalSuggestions);
   } catch (err: unknown) {

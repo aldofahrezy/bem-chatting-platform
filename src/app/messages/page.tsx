@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Trash2 } from "lucide-react" // Tambahkan Trash2
+import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Trash2 } from "lucide-react"
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -15,14 +15,35 @@ interface MessageProps {
   status?: 'normal' | 'request';
 }
 
-const Message: React.FC<{ msg: MessageProps; currentUserId: string; onDelete: (messageId: string) => void }> = ({ msg, currentUserId, onDelete }) => {
+// Perbarui prop untuk komponen Message agar menerima dua handler hapus yang berbeda
+const Message: React.FC<{
+  msg: MessageProps;
+  currentUserId: string;
+  onDeleteForMe: (messageId: string) => void;
+  onUnsend: (messageId: string) => void;
+}> = ({ msg, currentUserId, onDeleteForMe, onUnsend }) => {
   const isMe = msg.sender._id === currentUserId
   const formattedTime = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  const [showMenu, setShowMenu] = useState(false); // State untuk menampilkan/menyembunyikan menu opsi pesan
+  const menuRef = useRef<HTMLDivElement>(null); // Ref untuk mendeteksi klik di luar menu
+
+  // Tutup menu saat klik di luar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
-    <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-4 group`}> {/* Tambahkan group untuk hover */}
+    <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-4 group`}>
       <div
-        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm relative ${ // Tambahkan relative
+        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm relative ${
           isMe
             ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
             : "bg-white text-gray-800 border border-gray-100"
@@ -31,13 +52,32 @@ const Message: React.FC<{ msg: MessageProps; currentUserId: string; onDelete: (m
         <p className="text-sm">{msg.content}</p>
         <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>{formattedTime}</p>
         {isMe && (
-          <button
-            onClick={() => onDelete(msg._id)}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" // Tombol hapus
-            title="Hapus Pesan"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
+          // Pembungkus untuk tombol menu dan dropdown
+          <div ref={menuRef} className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+              className="bg-gray-700 text-white rounded-full p-1 hover:bg-gray-600"
+              title="Opsi Pesan"
+            >
+              <MoreHorizontal className="w-3 h-3" />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 mt-1 w-36 bg-white rounded-md shadow-lg overflow-hidden">
+                <button
+                  onClick={() => { onDeleteForMe(msg._id); setShowMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Hapus untuk saya
+                </button>
+                <button
+                  onClick={() => { onUnsend(msg._id); setShowMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Batalkan pengiriman
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -80,11 +120,14 @@ export default function MessagesPage() {
   const [outgoingFriendRequests, setOutgoingFriendRequests] = useState<FriendshipRequest[]>([]);
   const [usersFoundBySearch, setUsersFoundBySearch] = useState<UserData[]>([]);
   const [messageRequests, setMessageRequests] = useState<MessageProps[]>([]);
-  const [suggestedUsers, setSuggestedUsers] = useState<UserData[]>([]); // State baru untuk saran pengguna
+  const [suggestedUsers, setSuggestedUsers] = useState<UserData[]>([]);
+
+  // State deletedMessagesLocal dihapus karena filtering di backend
+  // const [deletedMessagesLocal, setDeletedMessagesLocal] = useState<string[]>([]);
 
   // State untuk manajemen UI sidebar
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search' | 'suggestions'>('chats'); // Tambahkan 'suggestions'
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -107,7 +150,7 @@ export default function MessagesPage() {
       } else {
         setCurrentUserId(userId)
         setCurrentUsername(username)
-        setLoading(false)
+        setLoading(false);
       }
     }
   }, [router]);
@@ -131,6 +174,7 @@ export default function MessagesPage() {
                 headers: { Authorization: authHeader }
               });
               const msgs: MessageProps[] = await msgResponse.json();
+              // Filter pesan yang dihapus secara lokal sudah dilakukan di backend
               const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : undefined;
               return {
                 ...friend,
@@ -257,6 +301,7 @@ export default function MessagesPage() {
       });
       const data = await response.json();
       if (response.ok) {
+        // Filter pesan yang dihapus secara lokal sudah dilakukan di backend
         setMessages(data);
       } else {
         setError(data.message || "Gagal memuat riwayat percakapan.");
@@ -283,14 +328,50 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Handler untuk menghapus pesan
-  const handleDeleteMessage = async (messageId: string) => {
+  // Handler untuk "Delete for me"
+  const handleDeleteForMe = useCallback(async (messageId: string) => {
+    const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus pesan ini hanya untuk Anda?");
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      const authHeader = getAuthHeader();
+      const response = await fetch(`http://localhost:5001/api/messages/${messageId}/delete-for-me`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      });
+
+      if (response.ok) {
+        // Setelah berhasil di backend, muat ulang riwayat percakapan
+        fetchConversationHistory();
+        fetchFriends();
+        fetchMessageRequests();
+        fetchSuggestedUsers();
+        alert('Pesan berhasil dihapus untuk Anda.');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Gagal menghapus pesan untuk Anda.');
+      }
+    } catch (error: unknown) {
+      console.error("Kesalahan menghapus pesan untuk saya:", error);
+      alert('Terjadi kesalahan jaringan saat menghapus pesan untuk Anda.');
+    }
+  }, [currentUserId, fetchConversationHistory, fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]);
+
+
+  // Handler untuk "Unsend message" (menghapus dari database untuk semua)
+  const handleUnsendMessage = async (messageId: string) => {
     if (!currentUserId) {
       alert("Anda belum login.");
       return;
     }
-    const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus pesan ini? Ini akan menghapus pesan untuk kedua belah pihak (unsend).");
-    if (!confirmDelete) {
+    const confirmUnsend = window.confirm("Apakah Anda yakin ingin membatalkan pengiriman pesan ini? Ini akan menghapus pesan untuk kedua belah pihak.");
+    if (!confirmUnsend) {
       return;
     }
 
@@ -304,19 +385,20 @@ export default function MessagesPage() {
       });
 
       if (response.ok) {
-        // Hapus pesan dari UI secara optimis
-        setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
-        alert('Pesan berhasil dihapus.');
-        // Perbarui daftar teman untuk memperbarui pesan terakhir jika pesan yang dihapus adalah yang terakhir
+        alert('Pesan berhasil dibatalkan pengiriman.');
+        // Muat ulang semua data yang relevan
         fetchFriends();
-        fetchMessageRequests(); // Juga perbarui pesan permintaan jika yang dihapus adalah pesan permintaan
+        fetchFriendRequests();
+        fetchMessageRequests();
+        fetchSuggestedUsers();
+        fetchConversationHistory();
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Gagal menghapus pesan.');
+        alert(errorData.message || 'Gagal membatalkan pengiriman pesan.');
       }
     } catch (error: unknown) {
-      console.error("Kesalahan menghapus pesan:", error);
-      alert('Terjadi kesalahan jaringan saat menghapus pesan.');
+      console.error("Kesalahan membatalkan pengiriman pesan:", error);
+      alert('Terjadi kesalahan jaringan saat membatalkan pengiriman pesan.');
     }
   };
 
@@ -476,7 +558,7 @@ export default function MessagesPage() {
       if (response.ok) {
         alert(data.message);
         fetchFriendRequests();
-        fetchSuggestedUsers(); // Perbarui saran setelah mengirim permintaan
+        fetchSuggestedUsers();
       } else {
         alert(data.message || 'Gagal mengirim permintaan pertemanan.');
       }
@@ -499,7 +581,7 @@ export default function MessagesPage() {
         alert(data.message);
         fetchFriendRequests();
         fetchFriends();
-        fetchSuggestedUsers(); // Perbarui saran setelah menerima permintaan
+        fetchSuggestedUsers();
       } else {
         alert(data.message || 'Gagal menerima permintaan pertemanan.');
       }
@@ -521,7 +603,7 @@ export default function MessagesPage() {
       if (response.ok) {
         alert(data.message);
         fetchFriendRequests();
-        fetchSuggestedUsers(); // Perbarui saran setelah menolak permintaan
+        fetchSuggestedUsers();
       } else {
         alert(data.message || 'Gagal menolak permintaan pertemanan.');
       }
@@ -742,8 +824,7 @@ export default function MessagesPage() {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Hasil Pencarian ({usersFoundBySearch.length})</h2>
                 <div className="space-y-3">
                   {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada pengguna ditemukan.</p>}
-                  {suggestedUsers.length === 0 && searchTerm.length <= 2 && <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>}
-                  {suggestedUsers.map((user) => (
+                  {usersFoundBySearch.map((user) => (
                     <div
                       key={user._id}
                       onClick={() => handleChatSelect(user, 'searchResult')}
@@ -833,8 +914,8 @@ export default function MessagesPage() {
                   </div>
                 )}
                 {messages.map((msg) => (
-                  <Message key={msg._id} msg={msg} currentUserId={currentUserId!} onDelete={handleDeleteMessage} /> 
-                ))} 
+                  <Message key={msg._id} msg={msg} currentUserId={currentUserId!} onDeleteForMe={handleDeleteForMe} onUnsend={handleUnsendMessage} />
+                ))}
                 <div ref={messagesEndRef} />
               </>
             )}
@@ -932,8 +1013,9 @@ export default function MessagesPage() {
               <h2 className="text-lg font-semibold text-gray-800">Saran Pengguna</h2>
             </div>
             <div className="p-4 space-y-3">
+              {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada saran.</p>}
               {suggestedUsers.length === 0 && searchTerm.length <= 2 && <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>}
-              {suggestedUsers.map((user) => (
+              {usersFoundBySearch.map((user) => (
                 <div
                   key={user._id}
                   onClick={() => handleChatSelect(user, 'searchResult')}

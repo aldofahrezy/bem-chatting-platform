@@ -308,3 +308,37 @@ export const deleteMessage = async (req: AuthenticatedRequest, res: Response) =>
     }
   }
 };
+
+export const deleteMessageForMe = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?._id;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Pengguna tidak terotentikasi.' });
+  }
+
+  try {
+    const message = await Message.findById(id);
+    if (!message) {
+      return res.status(404).json({ message: 'Pesan tidak ditemukan.' });
+    }
+
+    // Pastikan pesan ini dikirim oleh pengguna yang meminta penghapusan
+    if (message.sender.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'Anda tidak diizinkan menghapus pesan ini untuk Anda.' });
+    }
+
+    // Tambahkan ID pengguna ke array deletedFor
+    // $addToSet memastikan ID hanya ditambahkan sekali
+    await Message.findByIdAndUpdate(id, { $addToSet: { deletedFor: userId } });
+
+    res.status(200).json({ message: 'Pesan berhasil dihapus untuk Anda.' });
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.error('Kesalahan menghapus pesan untuk saya:', err);
+      res.status(500).json({ message: 'Kesalahan server saat menghapus pesan untuk saya: ' + err.message });
+    } else {
+      res.status(500).json({ message: 'Kesalahan server saat menghapus pesan untuk saya: An unknown error occurred.' });
+    }
+  }
+};

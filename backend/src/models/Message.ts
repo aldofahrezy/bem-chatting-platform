@@ -6,7 +6,8 @@ export interface IMessage extends Document {
   receiver: Types.ObjectId;
   content: string;
   timestamp: Date;
-  status: 'normal' | 'request'; // Menambahkan status pesan
+  status: 'normal' | 'request';
+  deletedFor: Types.ObjectId[];
 }
 
 // Definisikan skema Message
@@ -15,7 +16,8 @@ const MessageSchema: Schema = new Schema({
   receiver: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
-  status: { type: String, enum: ['normal', 'request'], default: 'normal' } // Default status normal
+  status: { type: String, enum: ['normal', 'request'], default: 'normal' },
+  deletedFor: [{ type: Schema.Types.ObjectId, ref: 'User' }]
 });
 
 export default mongoose.model<IMessage>('Message', MessageSchema);
