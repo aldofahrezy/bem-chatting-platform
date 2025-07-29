@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X } from "lucide-react"
+import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Trash2 } from "lucide-react" // Tambahkan Trash2
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -15,14 +15,14 @@ interface MessageProps {
   status?: 'normal' | 'request';
 }
 
-const Message: React.FC<{ msg: MessageProps; currentUserId: string }> = ({ msg, currentUserId }) => {
+const Message: React.FC<{ msg: MessageProps; currentUserId: string; onDelete: (messageId: string) => void }> = ({ msg, currentUserId, onDelete }) => {
   const isMe = msg.sender._id === currentUserId
   const formattedTime = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
   return (
-    <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-4`}>
+    <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-4 group`}> {/* Tambahkan group untuk hover */}
       <div
-        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm relative ${ // Tambahkan relative
           isMe
             ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
             : "bg-white text-gray-800 border border-gray-100"
@@ -30,6 +30,15 @@ const Message: React.FC<{ msg: MessageProps; currentUserId: string }> = ({ msg, 
       >
         <p className="text-sm">{msg.content}</p>
         <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>{formattedTime}</p>
+        {isMe && (
+          <button
+            onClick={() => onDelete(msg._id)}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" // Tombol hapus
+            title="Hapus Pesan"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -274,6 +283,44 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  // Handler untuk menghapus pesan
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!currentUserId) {
+      alert("Anda belum login.");
+      return;
+    }
+    const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus pesan ini? Ini akan menghapus pesan untuk kedua belah pihak (unsend).");
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      const authHeader = getAuthHeader();
+      const response = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': authHeader,
+        },
+      });
+
+      if (response.ok) {
+        // Hapus pesan dari UI secara optimis
+        setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
+        alert('Pesan berhasil dihapus.');
+        // Perbarui daftar teman untuk memperbarui pesan terakhir jika pesan yang dihapus adalah yang terakhir
+        fetchFriends();
+        fetchMessageRequests(); // Juga perbarui pesan permintaan jika yang dihapus adalah pesan permintaan
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Gagal menghapus pesan.');
+      }
+    } catch (error: unknown) {
+      console.error("Kesalahan menghapus pesan:", error);
+      alert('Terjadi kesalahan jaringan saat menghapus pesan.');
+    }
+  };
+
+
   // Handler untuk mengirim pesan
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -290,7 +337,7 @@ export default function MessagesPage() {
     // Logika konfirmasi permintaan pertemanan
     const isFriend = friends.some(f => f._id === selectedChatUser._id);
     const hasOutgoingRequest = outgoingFriendRequests.some(req => req.recipient._id === selectedChatUser._id);
-    const hasIncomingRequest = incomingFriendRequests.some(req => req.requester._id === selectedChatUser._id);
+    const hasIncomingRequest = incomingFriendRequests.some(req => req.requester?._id === selectedChatUser._id);
 
     // Jika bukan teman dan belum ada permintaan pertemanan yang tertunda (keluar atau masuk)
     if (!isFriend && !hasOutgoingRequest && !hasIncomingRequest) {
@@ -626,9 +673,9 @@ export default function MessagesPage() {
                     <div key={req._id} className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
-                          {req.requester.username.charAt(0).toUpperCase()}
+                          {req.requester.username?.charAt(0).toUpperCase() || 'U'}
                         </div>
-                        <span className="font-medium text-gray-800">{req.requester.username}</span>
+                        <span className="font-medium text-gray-800">{req.requester.username || 'Unknown User'}</span>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -657,21 +704,16 @@ export default function MessagesPage() {
                     <div
                       key={msgReq._id}
                       onClick={() => handleChatSelect(msgReq.sender, 'messageRequests')}
-                      className={`p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
-                        selectedChatUser?._id === msgReq.sender._id ? "bg-blue-50 border border-blue-200" : ""
-                      }`}
+                      className="flex items-start gap-3 p-3 bg-yellow-50 rounded-xl cursor-pointer transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-lg">
-                            {msgReq.sender.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white"></div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-800 truncate">{msgReq.sender.username}</h3>
-                          <p className="text-sm text-gray-500 truncate">{msgReq.content}</p>
-                        </div>
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+                        {msgReq.sender.username?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800">
+                          <span className="font-semibold">{msgReq.sender.username || 'Unknown User'}</span> mengirim pesan permintaan: &quot;{msgReq.content}&quot;
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{new Date(msgReq.timestamp).toLocaleString()}</p>
                       </div>
                     </div>
                   ))}
@@ -684,9 +726,9 @@ export default function MessagesPage() {
                     <div key={req._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
-                          {req.recipient.username.charAt(0).toUpperCase()}
+                          {req.recipient.username?.charAt(0).toUpperCase() || 'U'}
                         </div>
-                        <span className="font-medium text-gray-800">{req.recipient.username}</span>
+                        <span className="font-medium text-gray-800">{req.recipient.username || 'Unknown User'}</span>
                       </div>
                       <span className="text-sm text-gray-500">Pending</span>
                     </div>
@@ -700,7 +742,8 @@ export default function MessagesPage() {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Hasil Pencarian ({usersFoundBySearch.length})</h2>
                 <div className="space-y-3">
                   {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada pengguna ditemukan.</p>}
-                  {usersFoundBySearch.map((user) => (
+                  {suggestedUsers.length === 0 && searchTerm.length <= 2 && <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>}
+                  {suggestedUsers.map((user) => (
                     <div
                       key={user._id}
                       onClick={() => handleChatSelect(user, 'searchResult')}
@@ -790,8 +833,8 @@ export default function MessagesPage() {
                   </div>
                 )}
                 {messages.map((msg) => (
-                  <Message key={msg._id} msg={msg} currentUserId={currentUserId!} />
-                ))}
+                  <Message key={msg._id} msg={msg} currentUserId={currentUserId!} onDelete={handleDeleteMessage} /> 
+                ))} 
                 <div ref={messagesEndRef} />
               </>
             )}
@@ -838,11 +881,11 @@ export default function MessagesPage() {
               {incomingFriendRequests.map((req) => (
                 <div key={req._id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl transition-colors">
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
-                    {req.requester.username.charAt(0).toUpperCase()}
+                    {req.requester.username?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-800">
-                      <span className="font-semibold">{req.requester.username}</span> mengirim permintaan pertemanan.
+                      <span className="font-semibold">{req.requester.username || 'Unknown User'}</span> mengirim permintaan pertemanan.
                     </p>
                     <div className="flex gap-2 mt-2">
                       <button
@@ -870,11 +913,11 @@ export default function MessagesPage() {
                   className="flex items-start gap-3 p-3 bg-yellow-50 rounded-xl cursor-pointer transition-colors"
                 >
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
-                    {msgReq.sender.username.charAt(0).toUpperCase()}
+                    {msgReq.sender.username?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-800">
-                      <span className="font-semibold">{msgReq.sender.username}</span> mengirim pesan permintaan: &quot;{msgReq.content}&quot;
+                      <span className="font-semibold">{msgReq.sender.username || 'Unknown User'}</span> mengirim pesan permintaan: &quot;{msgReq.content}&quot;
                     </p>
                     <p className="text-xs text-gray-500 mt-1">{new Date(msgReq.timestamp).toLocaleString()}</p>
                   </div>
@@ -889,7 +932,6 @@ export default function MessagesPage() {
               <h2 className="text-lg font-semibold text-gray-800">Saran Pengguna</h2>
             </div>
             <div className="p-4 space-y-3">
-              {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada saran.</p>}
               {suggestedUsers.length === 0 && searchTerm.length <= 2 && <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>}
               {suggestedUsers.map((user) => (
                 <div
