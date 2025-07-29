@@ -127,7 +127,7 @@ export default function MessagesPage() {
 
   // State untuk manajemen UI sidebar
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search'>('chats'); // 'suggestions' tab dihapus dari sini
+  const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search'>('chats');
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -359,7 +359,7 @@ export default function MessagesPage() {
       console.error("Kesalahan menghapus pesan untuk saya:", error);
       alert('Terjadi kesalahan jaringan saat menghapus pesan untuk Anda.');
     }
-  }, [currentUserId, fetchConversationHistory, fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]);
+  }, [fetchConversationHistory, fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]);
 
 
   // Handler untuk "Unsend message" (menghapus dari database untuk semua)

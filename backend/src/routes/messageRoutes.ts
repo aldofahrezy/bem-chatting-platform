@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createMessage, getMessages, updateMessage, deleteMessage, getMessageRequests, getConversationHistory, deleteMessageForMe } from '../controllers/messageController'; // Import getConversationHistory
+import { createMessage, getMessages, updateMessage, deleteMessage, getMessageRequests, getConversationHistory, deleteMessageForMe } from '../controllers/messageController';
 import { basicAuth } from '../controllers/authController';
 
 const router = Router();

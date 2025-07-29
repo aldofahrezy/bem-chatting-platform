@@ -189,11 +189,14 @@ export const getConversationHistory = async (req: AuthenticatedRequest, res: Res
     const otherUserId = otherUser._id;
 
     // Retrieve all messages (normal and request) between two users
+    // AND filter out messages that are marked as 'deletedFor' the current userId
     const messages = await Message.find({
       $or: [
         { sender: userId, receiver: otherUserId },
         { sender: otherUserId, receiver: userId },
       ],
+      // Add this condition to filter out messages deleted for the current user
+      deletedFor: { $nin: [userId] } // $nin ensures userId is NOT in the deletedFor array
     })
       .sort({ timestamp: 1 })
       .populate('sender', 'username')
