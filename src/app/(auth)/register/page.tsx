@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState<string>('');
@@ -12,11 +13,13 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   // --- INTERFACES UNTUK RESPON API ---
   interface RegisterSuccessData {
     message: string;
-    // Tambahan properti lain dari server jika ada, misal: userId, username
+    userId: string;
+    username: string;
   }
 
   interface ErrorData {
@@ -45,24 +48,31 @@ export default function RegisterPage() {
         body: JSON.stringify({ username, password }),
       });
 
-      // Data bisa berupa sukses atau error, kita tentukan tipenya setelah mengecek response.ok
       const data: RegisterSuccessData | ErrorData = await response.json();
 
       if (response.ok) {
-        // Asumsi data adalah RegisterSuccessData jika respons sukses
         const successData = data as RegisterSuccessData;
-        setSuccess(successData.message || 'Pendaftaran berhasil! Silakan login.');
-        setTimeout(() => {
-          router.push('/auth/login');
-        }, 1500);
+        
+        // Langsung Login setelah Pendaftaran Berhasil
+        if (successData.userId && successData.username) {
+            const credentials = btoa(`${username}:${password}`); // Buat kredensial untuk Basic Auth
+            login(successData.userId, successData.username, credentials); // Panggil fungsi login dari Context
+            setSuccess('Pendaftaran berhasil! Anda berhasil login.');
+            router.push('/messages'); // Langsung arahkan ke halaman pesan
+        } else {
+            // Jika backend tidak mengembalikan userId/username, fallback ke redirect ke login
+            setSuccess(successData.message || 'Pendaftaran berhasil! Silakan login.');
+            setTimeout(() => {
+                router.push('/login'); // Redirect ke halaman login setelah sukses
+            }, 1500);
+        }
+
       } else {
-        // Asumsi data adalah ErrorData jika respons gagal
         const errorData = data as ErrorData;
         setError(errorData.message || 'Pendaftaran gagal. Silakan coba lagi.');
       }
     } catch (err: unknown) {
       console.error('Kesalahan saat mendaftar:', err);
-      // Melakukan type narrowing untuk error yang bertipe unknown
       if (err instanceof Error) {
         setError(`Terjadi kesalahan jaringan atau server: ${err.message}`);
       } else {
@@ -89,7 +99,7 @@ export default function RegisterPage() {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg"
+              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-900 placeholder-gray-400"
               placeholder="Pilih nama pengguna"
               required
               disabled={loading}
@@ -104,7 +114,7 @@ export default function RegisterPage() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg"
+              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-900 placeholder-gray-400"
               placeholder="Buat kata sandi"
               required
               disabled={loading}
@@ -119,7 +129,7 @@ export default function RegisterPage() {
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg"
+              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-900 placeholder-gray-400"
               placeholder="Konfirmasi kata sandi"
               required
               disabled={loading}
@@ -140,7 +150,7 @@ export default function RegisterPage() {
           </button>
         </form>
         <p className="mt-6 text-center text-gray-600 text-sm">
-          Sudah punya akun? <Link href="/auth/login" className="text-blue-600 hover:underline">Masuk di sini</Link>
+          Sudah punya akun? <Link href="/login" className="text-blue-600 hover:underline">Masuk di sini</Link>
         </p>
       </div>
     </div>

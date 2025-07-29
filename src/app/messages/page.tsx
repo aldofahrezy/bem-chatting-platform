@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Edit2 } from "lucide-react"
+import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Edit, Edit2 } from "lucide-react"
+import { useAuth } from '@/context/AuthContext';
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -54,7 +54,7 @@ const Message: React.FC<{
         <p className="text-sm">{msg.content}</p>
         <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>
           {formattedTime}
-          {msg.isEdited && <span className="ml-2 opacity-80">(Diedit)</span>} {/* <--- ADD THIS CONDITIONAL SPAN */}
+          {msg.isEdited && <span className="ml-2 opacity-80">(Diedit)</span>}
         </p>
         {isMe && (
           // Pembungkus untuk tombol menu dan dropdown
@@ -72,6 +72,7 @@ const Message: React.FC<{
                   onClick={() => { onEdit(msg); setShowMenu(false); }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
+                  <Edit className="inline-block mr-2 size-auto" />
                   Edit
                 </button>
                 <button
@@ -116,14 +117,14 @@ interface FriendshipRequest {
 }
 
 export default function MessagesPage() {
-  const router = useRouter()
   const [messages, setMessages] = useState<MessageProps[]>([])
   const [newMessageContent, setNewMessageContent] = useState<string>("")
   const [selectedChatUser, setSelectedChatUser] = useState<UserData | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [currentUsername, setCurrentUsername] = useState<string | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Gunakan useAuth hook untuk mendapatkan status login
+  const { isLoggedIn, username: currentUsername, logout } = useAuth();
+  const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('userId') : null;
 
   // State baru untuk data dari backend
   const [friends, setFriends] = useState<FriendWithLastMessage[]>([]);
@@ -152,24 +153,9 @@ export default function MessagesPage() {
     return ""
   }, []);
 
-  // Efek untuk memeriksa status login dan memuat data pengguna
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const userId = localStorage.getItem("userId")
-      const username = localStorage.getItem("username")
-      if (!userId || !username) {
-        router.push("/auth/login")
-      } else {
-        setCurrentUserId(userId)
-        setCurrentUsername(username)
-        setLoading(false);
-      }
-    }
-  }, [router]);
-
   // Fungsi untuk mengambil daftar teman dan pesan terakhir mereka
   const fetchFriends = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || !isLoggedIn) return; // Pastikan currentUserId dan isLoggedIn ada
     try {
       const authHeader = getAuthHeader();
       const response = await fetch('http://localhost:5001/api/users/friends', {
@@ -178,7 +164,6 @@ export default function MessagesPage() {
       
       if (response.ok) {
         const friendList: UserData[] = await response.json();
-        // Untuk setiap teman, ambil pesan terakhir
         const friendsWithMessages: FriendWithLastMessage[] = await Promise.all(
           friendList.map(async (friend) => {
             try {
@@ -186,7 +171,6 @@ export default function MessagesPage() {
                 headers: { Authorization: authHeader }
               });
               const msgs: MessageProps[] = await msgResponse.json();
-              // Filter pesan yang dihapus secara lokal sudah dilakukan di backend
               const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : undefined;
               return {
                 ...friend,
@@ -211,11 +195,11 @@ export default function MessagesPage() {
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat memuat teman:', error);
     }
-  }, [currentUserId, getAuthHeader]);
+  }, [currentUserId, isLoggedIn, getAuthHeader]);
 
   // Fungsi untuk mengambil permintaan pertemanan
   const fetchFriendRequests = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || !isLoggedIn) return;
     try {
       const authHeader = getAuthHeader();
       const response = await fetch('http://localhost:5001/api/users/friend-requests/pending', {
@@ -235,11 +219,11 @@ export default function MessagesPage() {
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat memuat permintaan pertemanan:', error);
     }
-  }, [currentUserId, getAuthHeader]);
+  }, [currentUserId, isLoggedIn, getAuthHeader]);
 
   // Fungsi untuk mengambil pesan permintaan
   const fetchMessageRequests = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || !isLoggedIn) return;
     try {
       const authHeader = getAuthHeader();
       const response = await fetch('http://localhost:5001/api/messages/requests', {
@@ -258,11 +242,11 @@ export default function MessagesPage() {
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat memuat pesan permintaan:', error);
     }
-  }, [currentUserId, getAuthHeader]);
+  }, [currentUserId, isLoggedIn, getAuthHeader]);
 
   // Fungsi untuk mengambil saran pengguna
   const fetchSuggestedUsers = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || !isLoggedIn) return;
     try {
       const authHeader = getAuthHeader();
       const response = await fetch('http://localhost:5001/api/users/suggestions', {
@@ -281,18 +265,18 @@ export default function MessagesPage() {
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat memuat saran pengguna:', error);
     }
-  }, [currentUserId, getAuthHeader]);
+  }, [currentUserId, isLoggedIn, getAuthHeader]);
 
 
   // Efek untuk memuat data awal (teman, permintaan, pesan permintaan, saran)
   useEffect(() => {
-    if (currentUserId) {
+    if (currentUserId && isLoggedIn) {
       fetchFriends();
       fetchFriendRequests();
       fetchMessageRequests();
-      fetchSuggestedUsers(); // Panggil fungsi baru
+      fetchSuggestedUsers();
     }
-  }, [currentUserId, fetchFriends, fetchFriendRequests, fetchMessageRequests, fetchSuggestedUsers]);
+  }, [currentUserId, isLoggedIn, fetchFriends, fetchFriendRequests, fetchMessageRequests, fetchSuggestedUsers]); // Tambah isLoggedIn ke dependensi
 
   const handleEditMessage = useCallback((message: MessageProps) => {
     setEditingMessage(message);
@@ -319,7 +303,7 @@ export default function MessagesPage() {
 
   // Efek untuk memuat pesan ketika selectedChatUser berubah
   const fetchConversationHistory = useCallback(async () => {
-    if (!currentUserId || !selectedChatUser) {
+    if (!currentUserId || !selectedChatUser || !isLoggedIn) {
       setMessages([]);
       return;
     }
@@ -347,13 +331,13 @@ export default function MessagesPage() {
         setError("Terjadi kesalahan jaringan atau server saat memuat riwayat percakapan: An unknown error occurred.");
       }
     }
-  }, [currentUserId, selectedChatUser, getAuthHeader]);
+  }, [currentUserId, selectedChatUser, isLoggedIn, getAuthHeader]);
 
   useEffect(() => {
-    if (currentUserId && selectedChatUser) {
+    if (currentUserId && selectedChatUser && isLoggedIn) {
       fetchConversationHistory();
     }
-  }, [currentUserId, selectedChatUser, fetchConversationHistory]);
+  }, [currentUserId, selectedChatUser, isLoggedIn, fetchConversationHistory]);
 
 
   // Efek untuk menggulir ke bawah setiap kali pesan berubah
@@ -380,7 +364,8 @@ export default function MessagesPage() {
       });
 
       if (response.ok) {
-        fetchConversationHistory(); // Muat ulang riwayat agar pesan yang dihapus tidak terlihat
+        // Optmistic update for delete for me
+        setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
         fetchFriends(); // Perbarui daftar teman untuk mendapatkan pesan terakhir
         fetchMessageRequests(); // Perbarui pesan permintaan jika perlu
         fetchSuggestedUsers(); // Perbarui saran pengguna
@@ -393,8 +378,7 @@ export default function MessagesPage() {
       console.error("Kesalahan menghapus pesan untuk saya:", error);
       alert('Terjadi kesalahan jaringan saat menghapus pesan untuk Anda.');
     }
-  }, [fetchConversationHistory, fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]);
-
+  }, [fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]); // Hapus fetchConversationHistory dari dependensi karena optimistik update
 
   // Handler untuk "Unsend message" (menghapus dari database untuk semua)
   const handleUnsendMessage = async (messageId: string) => {
@@ -467,7 +451,7 @@ export default function MessagesPage() {
           // Optimistically update the message in the UI
           setMessages(prevMessages =>
             prevMessages.map(msg =>
-              msg._id === data._id ? { ...msg, content: data.content } : msg
+              msg._id === data._id ? { ...msg, content: data.content, isEdited: true } : msg // <--- Set isEdited to true
             )
           );
           // Re-fetch to ensure full consistency and update last message in sidebar if applicable
@@ -520,7 +504,8 @@ export default function MessagesPage() {
             receiver: { _id: selectedChatUser._id, username: selectedChatUser.username },
             content: newMessageContent,
             timestamp: new Date().toISOString(),
-            status: data.status || 'normal'
+            status: data.status || 'normal',
+            isEdited: false // New messages are not edited
           };
           setMessages(prevMessages => [...prevMessages, tempMessage]);
 
@@ -547,16 +532,6 @@ export default function MessagesPage() {
     }
   };
 
-  // Handler untuk logout
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("userId")
-      localStorage.removeItem("username")
-      localStorage.removeItem("basicAuthCredentials")
-    }
-    router.push("/auth/login")
-  }
-
   // Handler untuk memilih kontak (teman, permintaan, atau hasil pencarian)
   const handleChatSelect = (user: UserData, chatType: 'friends' | 'messageRequests' | 'searchResult') => {
     if (!selectedChatUser || selectedChatUser._id !== user._id) {
@@ -571,6 +546,10 @@ export default function MessagesPage() {
     } else if (chatType === 'searchResult') {
       setActiveTab('search');
     }
+
+    setTimeout(() => {
+      messageInputRef.current?.focus();
+    }, 0);
   };
 
   // Handler untuk mencari pengguna
@@ -687,25 +666,22 @@ export default function MessagesPage() {
   };
 
 
-  if (loading) {
+  // Perubahan pada kondisi loading/redirect
+  if (!isLoggedIn || !currentUserId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-500">
         <div className="bg-white rounded-2xl p-8 shadow-2xl">
-          <p className="text-xl text-blue-600 font-semibold">Memuat...</p>
+          <p className="text-xl text-blue-600 font-semibold">Logging out...</p>
         </div>
       </div>
-    )
-  }
-
-  if (!currentUserId) {
-    return null
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto h-screen flex gap-4">
         {/* Left Sidebar - Contacts, Search, Requests */}
-        <div className="w-80 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        <div className="w-80 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col h-full">
           {/* Header */}
           <div className="p-6 border-b border-gray-100">
             <div className="flex items-center justify-between mb-4">
@@ -726,7 +702,7 @@ export default function MessagesPage() {
               <Phone className="w-5 h-5 text-gray-400" />
               <Video className="w-5 h-5 text-gray-400" />
               <div className="ml-auto">
-                <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-700 font-medium">
+                <button onClick={logout} className="text-sm text-red-600 hover:text-red-700 font-medium"> {/* <--- Panggil logout dari AuthContext */}
                   Logout
                 </button>
               </div>
@@ -742,7 +718,7 @@ export default function MessagesPage() {
                 placeholder="Cari pengguna atau chat..."
                 value={searchTerm}
                 onChange={handleSearch}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-900 placeholder-gray-600"
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-900 placeholder-gray-400"
               />
             </div>
           </div>
@@ -1004,7 +980,7 @@ export default function MessagesPage() {
           {/* Message Input */}
           {selectedChatUser && (
             <div className="p-6 border-t border-gray-100 bg-white">
-              {editingMessage && ( // <--- Conditional rendering for editing UI
+              {editingMessage && (
                 <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
                   <div className="flex items-center gap-2">
                     <Edit2 className="w-5 h-5 text-blue-600" />
@@ -1021,12 +997,12 @@ export default function MessagesPage() {
               <form onSubmit={handleSendMessage} className="flex items-center gap-4">
                 <div className="flex-1 relative">
                   <input
-                    ref={messageInputRef} // <--- Attach the ref here
+                    ref={messageInputRef}
                     type="text"
                     value={newMessageContent}
                     onChange={(e) => setNewMessageContent(e.target.value)}
                     placeholder={editingMessage ? "Edit pesan Anda..." : "Ketik pesan Anda di sini..."} // <--- Dynamic placeholder
-                    className="w-full px-4 py-3 bg-gray-50 rounded-2xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all pr-12 text-gray-900 placeholder-gray-600"
+                    className="w-full px-4 py-3 bg-gray-50 rounded-2xl border-0 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-900 placeholder-gray-400"
                   />
                 </div>
                 <button
@@ -1041,16 +1017,16 @@ export default function MessagesPage() {
         </div>
 
         {/* Right Sidebar - Notifications & Suggestions */}
-        <div className="w-80 space-y-4">
+        <div className="w-80 space-y-4 flex flex-col h-full">
           {/* Notifications */}
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex-1 flex flex-col">
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Bell className="w-5 h-5 text-blue-600" />
                 <h2 className="text-lg font-semibold text-gray-800">Notifikasi</h2>
               </div>
             </div>
-            <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
+            <div className="p-4 space-y-3 overflow-y-auto flex-1">
               {incomingFriendRequests.length === 0 && messageRequests.length === 0 && (
                 <p className="text-gray-500 text-sm">Tidak ada notifikasi baru.</p>
               )}
@@ -1103,18 +1079,18 @@ export default function MessagesPage() {
           </div>
 
           {/* Suggestions */}
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex-1 flex flex-col">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-800">Saran Pengguna</h2>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 overflow-y-auto flex-1">
               {suggestedUsers.length === 0 ? ( // Selalu tampilkan pesan ini jika suggestedUsers kosong
                 <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>
               ) : ( // Jika ada suggestedUsers, tampilkan mereka
                 suggestedUsers.map((user) => (
                   <div
                     key={user._id}
-                    onClick={() => handleChatSelect(user, 'searchResult')} // Menggunakan searchResult karena ini adalah saran, bukan teman langsung
+                    onClick={() => handleChatSelect(user, 'searchResult')}
                     className={`flex items-center p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
                       selectedChatUser?._id === user._id ? "bg-blue-50 border border-blue-200" : ""
                     }`}

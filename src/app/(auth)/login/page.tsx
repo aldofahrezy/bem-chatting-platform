@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
   const [username, setUsername] = useState<string>('');
@@ -10,13 +11,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
+  const { isLoggedIn, login } = useAuth();
 
   useEffect(() => {
-    // Cek apakah pengguna sudah login (ada userId di LocalStorage)
-    if (typeof window !== 'undefined' && localStorage.getItem('userId')) {
+    // Cek apakah pengguna sudah login melalui Context
+    if (isLoggedIn) {
       router.push('/messages'); // Arahkan ke halaman pesan jika sudah login
     }
-  }, [router]);
+  }, [isLoggedIn, router]); // Dependency array: isLoggedIn untuk re-evaluate jika status login berubah
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,33 +34,27 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
 
-      // Define an interface for the expected successful response data
       interface LoginSuccessData {
         userId: string;
         username: string;
       }
 
-      // Define an interface for the expected error response data
       interface ErrorData {
         message: string;
       }
 
-      // We'll parse the JSON data here, but type it based on success/failure later
       const data: LoginSuccessData | ErrorData = await response.json();
 
       if (response.ok) {
-        // Type assertion to tell TypeScript that 'data' is LoginSuccessData here
         const successData = data as LoginSuccessData;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('userId', successData.userId); // Simpan ID pengguna
-          localStorage.setItem('username', successData.username); // Simpan username
-          // Untuk Basic Auth, kita juga perlu menyimpan kredensial base64
-          const credentials = btoa(`${username}:${password}`);
-          localStorage.setItem('basicAuthCredentials', credentials);
-        }
-        router.push('/messages'); // Arahkan ke halaman pesan setelah login berhasil
+        
+        // Buat credentials untuk Basic Auth
+        const credentials = btoa(`${username}:${password}`);
+        
+        // PANGGIL FUNGSI LOGIN DARI AUTH CONTEXT
+        login(successData.userId, successData.username, credentials);
+        
       } else {
-        // Type assertion to tell TypeScript that 'data' is ErrorData here
         const errorData = data as ErrorData;
         setError(errorData.message || 'Login gagal. Silakan coba lagi.');
       }
@@ -90,7 +86,7 @@ export default function LoginPage() {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg"
+              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-900 placeholder-gray-400"
               placeholder="Masukkan nama pengguna"
               required
               disabled={loading}
@@ -105,7 +101,7 @@ export default function LoginPage() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg"
+              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-900 placeholder-gray-400"
               placeholder="Masukkan kata sandi"
               required
               disabled={loading}
@@ -123,7 +119,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="mt-6 text-center text-gray-600 text-sm">
-          Belum punya akun? <Link href="/auth/register" className="text-blue-600 hover:underline">Daftar di sini</Link>
+          Belum punya akun? <Link href="/register" className="text-blue-600 hover:underline">Daftar di sini</Link>
         </p>
       </div>
     </div>

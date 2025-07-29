@@ -15,60 +15,10 @@ export default function Home() {
   }, []);
 
   // Tentukan tujuan tombol "Mulai Ngobrol Sekarang!" berdasarkan status login
-  const chatButtonHref = isLoggedIn ? '/messages' : '/auth/login';
-
-  // Handler untuk logout dari Navbar Homepage
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('userId');
-      localStorage.removeItem('username');
-      localStorage.removeItem('basicAuthCredentials');
-    }
-    window.location.href = '/auth/login'; // Redirect manual setelah logout
-  };
+  const chatButtonHref = isLoggedIn ? '/messages' : '/login';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-inter text-gray-800">
-      {/* Navigation Bar */}
-      <nav className="bg-white shadow-lg py-4 px-6 md:px-12 flex justify-between items-center rounded-b-xl">
-        <div className="text-2xl font-extrabold text-blue-700">
-          BEM Chatting
-        </div>
-        <div className="space-x-6">
-          <Link href="/" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
-            Beranda
-          </Link>
-          <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
-            Fitur
-          </Link>
-          <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
-            Tentang Kami
-          </Link>
-          {/* Tombol Masuk/Logout di Navbar */}
-          {isLoggedIn ? (
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105"
-            >
-              Logout
-            </button>
-          ) : (
-            <>
-              <Link href="/auth/login" passHref>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
-                  Masuk
-                </button>
-              </Link>
-              <Link href="/auth/register" passHref>
-                <button className="bg-gray-200 hover:bg-gray-300 text-blue-700 font-semibold py-2 px-5 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
-                  Daftar
-                </button>
-              </Link>
-            </>
-          )}
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section className="relative flex items-center justify-center h-[calc(100vh-80px)] text-center px-6 md:px-12 overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: '' }}></div>
