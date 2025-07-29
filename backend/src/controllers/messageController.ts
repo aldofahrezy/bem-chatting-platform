@@ -267,8 +267,10 @@ export const updateMessage = async (req: AuthenticatedRequest, res: Response) =>
       return res.status(403).json({ message: 'Anda tidak diizinkan untuk mengupdate pesan ini.' });
     }
 
-    message.content = content;
+    message.content = content.trim();
+    message.isEdited = true;
     await message.save();
+    
     res.status(200).json(message);
   } catch (err: unknown) {
     if (err instanceof Error) {

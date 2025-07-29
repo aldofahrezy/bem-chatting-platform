@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X } from "lucide-react"
+import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Edit2 } from "lucide-react"
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -13,6 +13,7 @@ interface MessageProps {
   content: string
   timestamp: string
   status?: 'normal' | 'request';
+  isEdited?: boolean;
 }
 
 // Perbarui prop untuk komponen Message agar menerima dua handler hapus yang berbeda
@@ -21,7 +22,8 @@ const Message: React.FC<{
   currentUserId: string;
   onDeleteForMe: (messageId: string) => void;
   onUnsend: (messageId: string) => void;
-}> = ({ msg, currentUserId, onDeleteForMe, onUnsend }) => {
+  onEdit: (message: MessageProps) => void;
+}> = ({ msg, currentUserId, onDeleteForMe, onUnsend, onEdit }) => {
   const isMe = msg.sender._id === currentUserId
   const formattedTime = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   const [showMenu, setShowMenu] = useState(false); // State untuk menampilkan/menyembunyikan menu opsi pesan
@@ -50,7 +52,10 @@ const Message: React.FC<{
         }`}
       >
         <p className="text-sm">{msg.content}</p>
-        <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>{formattedTime}</p>
+        <p className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-400"}`}>
+          {formattedTime}
+          {msg.isEdited && <span className="ml-2 opacity-80">(Diedit)</span>} {/* <--- ADD THIS CONDITIONAL SPAN */}
+        </p>
         {isMe && (
           // Pembungkus untuk tombol menu dan dropdown
           <div ref={menuRef} className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
@@ -63,6 +68,12 @@ const Message: React.FC<{
             </button>
             {showMenu && (
               <div className="absolute right-0 mt-1 w-36 bg-white rounded-md shadow-lg overflow-hidden">
+                <button
+                  onClick={() => { onEdit(msg); setShowMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Edit
+                </button>
                 <button
                   onClick={() => { onDeleteForMe(msg._id); setShowMenu(false); }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -122,8 +133,9 @@ export default function MessagesPage() {
   const [messageRequests, setMessageRequests] = useState<MessageProps[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<UserData[]>([]);
 
-  // State deletedMessagesLocal dihapus karena filtering di backend
-  // const [deletedMessagesLocal, setDeletedMessagesLocal] = useState<string[]>([]);
+  // State mengedit pesan
+  const [editingMessage, setEditingMessage] = useState<MessageProps | null>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
 
   // State untuk manajemen UI sidebar
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -282,6 +294,28 @@ export default function MessagesPage() {
     }
   }, [currentUserId, fetchFriends, fetchFriendRequests, fetchMessageRequests, fetchSuggestedUsers]);
 
+  const handleEditMessage = useCallback((message: MessageProps) => {
+    setEditingMessage(message);
+    setNewMessageContent(message.content); // Pre-fill the input with message content
+    messageInputRef.current?.focus(); // Focus the input field
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+    setNewMessageContent(''); // Clear the input
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && editingMessage) {
+        handleCancelEdit();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editingMessage, handleCancelEdit]);
 
   // Efek untuk memuat pesan ketika selectedChatUser berubah
   const fetchConversationHistory = useCallback(async () => {
@@ -402,81 +436,116 @@ export default function MessagesPage() {
 
   // Handler untuk mengirim pesan
   const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!newMessageContent.trim() || !selectedChatUser) {
-      setError("Pesan atau pengguna yang dipilih tidak boleh kosong.")
-      return
+      setError("Pesan atau pengguna yang dipilih tidak boleh kosong.");
+      return;
     }
     if (!currentUserId) {
-      setError("Anda belum login.")
-      return
+      setError("Anda belum login.");
+      return;
     }
-    setError(null)
+    setError(null);
 
-    // Logika konfirmasi permintaan pertemanan
-    const isFriend = friends.some(f => f._id === selectedChatUser._id);
-    const hasOutgoingRequest = outgoingFriendRequests.some(req => req.recipient._id === selectedChatUser._id);
-    const hasIncomingRequest = incomingFriendRequests.some(req => req.requester?._id === selectedChatUser._id);
+    const authHeader = getAuthHeader();
 
-    // Jika bukan teman dan belum ada permintaan pertemanan yang tertunda (keluar atau masuk)
-    if (!isFriend && !hasOutgoingRequest && !hasIncomingRequest) {
-        const confirmSendRequest = window.confirm(
-            `Anda akan mengirim pesan kepada ${selectedChatUser.username}, yang bukan teman Anda. ` +
-            `Mengirim pesan ini juga akan mengirimkan permintaan pertemanan. Lanjutkan?`
-        );
-        if (!confirmSendRequest) {
-            return; // Pengguna membatalkan pengiriman
+    if (editingMessage) {
+      // Logic for editing an existing message
+      try {
+        const response = await fetch(`http://localhost:5001/api/messages/${editingMessage._id}`, {
+          method: "PUT", // Use PUT for updating
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({ content: newMessageContent }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setNewMessageContent("");
+          setEditingMessage(null); // Exit edit mode
+          // Optimistically update the message in the UI
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg._id === data._id ? { ...msg, content: data.content } : msg
+            )
+          );
+          // Re-fetch to ensure full consistency and update last message in sidebar if applicable
+          setTimeout(() => {
+            fetchConversationHistory();
+            fetchFriends(); // Update sidebar if last message was edited
+          }, 200);
+        } else {
+          setError(data.message || "Gagal mengupdate pesan.");
         }
-    }
-
-    try {
-      const authHeader = getAuthHeader()
-      const response = await fetch("http://localhost:5001/api/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeader,
-        },
-        body: JSON.stringify({ receiverUsername: selectedChatUser.username, content: newMessageContent }),
-      })
-      const data = await response.json()
-      if (response.ok) {
-        setNewMessageContent("")
-
-        // Optimistically add the new message to the UI
-        const tempMessage: MessageProps = {
-          _id: data._id || `temp-${Date.now()}`,
-          sender: { _id: currentUserId!, username: currentUsername! },
-          receiver: { _id: selectedChatUser._id, username: selectedChatUser.username },
-          content: newMessageContent,
-          timestamp: new Date().toISOString(),
-          status: data.status || 'normal'
-        };
-        setMessages(prevMessages => [...prevMessages, tempMessage]);
-
-        // Muat ulang data untuk memperbarui status pertemanan dan pesan permintaan
-        fetchFriends(); // Perbarui daftar teman untuk mendapatkan pesan terakhir
-        fetchFriendRequests();
-        fetchMessageRequests();
-        fetchSuggestedUsers(); // Perbarui saran pengguna
-
-        // Muat ulang riwayat percakapan setelah penundaan singkat
-        setTimeout(() => {
-          fetchConversationHistory();
-        }, 500);
-
-      } else {
-        setError(data.message || "Gagal mengirim pesan.")
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error("Kesalahan mengupdate pesan:", error);
+          setError("Terjadi kesalahan jaringan atau server saat mengupdate pesan: " + error.message);
+        } else {
+          setError("Terjadi kesalahan jaringan atau server saat mengupdate pesan: An unknown error occurred.");
+        }
       }
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error("Kesalahan mengirim pesan:", error);
-        setError("Terjadi kesalahan jaringan atau server saat mengirim pesan: " + error.message);
-      } else {
-        setError("Terjadi kesalahan jaringan atau server saat mengirim pesan: An unknown error occurred.");
+    } else {
+      // Original logic for sending a new message
+      const isFriend = friends.some(f => f._id === selectedChatUser._id);
+      const hasOutgoingRequest = outgoingFriendRequests.some(req => req.recipient._id === selectedChatUser._id);
+      const hasIncomingRequest = incomingFriendRequests.some(req => req.requester?._id === selectedChatUser._id);
+
+      if (!isFriend && !hasOutgoingRequest && !hasIncomingRequest) {
+          const confirmSendRequest = window.confirm(
+              `Anda akan mengirim pesan kepada ${selectedChatUser.username}, yang bukan teman Anda. ` +
+              `Mengirim pesan ini juga akan mengirimkan permintaan pertemanan. Lanjutkan?`
+          );
+          if (!confirmSendRequest) {
+              return;
+          }
+      }
+
+      try {
+        const response = await fetch("http://localhost:5001/api/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({ receiverUsername: selectedChatUser.username, content: newMessageContent }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setNewMessageContent("");
+          const tempMessage: MessageProps = {
+            _id: data._id || `temp-${Date.now()}`,
+            sender: { _id: currentUserId!, username: currentUsername! },
+            receiver: { _id: selectedChatUser._id, username: selectedChatUser.username },
+            content: newMessageContent,
+            timestamp: new Date().toISOString(),
+            status: data.status || 'normal'
+          };
+          setMessages(prevMessages => [...prevMessages, tempMessage]);
+
+          fetchFriends();
+          fetchFriendRequests();
+          fetchMessageRequests();
+          fetchSuggestedUsers();
+
+          setTimeout(() => {
+            fetchConversationHistory();
+          }, 500);
+
+        } else {
+          setError(data.message || "Gagal mengirim pesan.");
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error("Kesalahan mengirim pesan:", error);
+          setError("Terjadi kesalahan jaringan atau server saat mengirim pesan: " + error.message);
+        } else {
+          setError("Terjadi kesalahan jaringan atau server saat mengirim pesan: An unknown error occurred.");
+        }
       }
     }
-  }
+  };
 
   // Handler untuk logout
   const handleLogout = () => {
@@ -918,7 +987,14 @@ export default function MessagesPage() {
                   </div>
                 )}
                 {messages.map((msg) => (
-                  <Message key={msg._id} msg={msg} currentUserId={currentUserId!} onDeleteForMe={handleDeleteForMe} onUnsend={handleUnsendMessage} />
+                  <Message
+                    key={msg._id}
+                    msg={msg}
+                    currentUserId={currentUserId!}
+                    onDeleteForMe={handleDeleteForMe}
+                    onUnsend={handleUnsendMessage}
+                    onEdit={handleEditMessage}
+                  />
                 ))}
                 <div ref={messagesEndRef} />
               </>
@@ -928,13 +1004,28 @@ export default function MessagesPage() {
           {/* Message Input */}
           {selectedChatUser && (
             <div className="p-6 border-t border-gray-100 bg-white">
+              {editingMessage && ( // <--- Conditional rendering for editing UI
+                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Edit2 className="w-5 h-5 text-blue-600" />
+                    <span className="font-semibold text-blue-800">Mengedit Pesan</span>
+                    <span className="text-sm text-gray-600 truncate max-w-[calc(100%-150px)]">
+                      {editingMessage.content}
+                    </span>
+                  </div>
+                  <button onClick={handleCancelEdit} className="text-gray-500 hover:text-gray-700">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
               <form onSubmit={handleSendMessage} className="flex items-center gap-4">
                 <div className="flex-1 relative">
                   <input
+                    ref={messageInputRef} // <--- Attach the ref here
                     type="text"
                     value={newMessageContent}
                     onChange={(e) => setNewMessageContent(e.target.value)}
-                    placeholder="Ketik pesan Anda di sini..."
+                    placeholder={editingMessage ? "Edit pesan Anda..." : "Ketik pesan Anda di sini..."} // <--- Dynamic placeholder
                     className="w-full px-4 py-3 bg-gray-50 rounded-2xl border-0 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all pr-12 text-gray-900 placeholder-gray-600"
                   />
                 </div>
