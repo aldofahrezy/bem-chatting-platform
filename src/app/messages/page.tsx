@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Trash2 } from "lucide-react"
+import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X } from "lucide-react"
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -579,6 +579,13 @@ export default function MessagesPage() {
         fetchFriendRequests();
         fetchFriends();
         fetchSuggestedUsers();
+        fetchMessageRequests();
+        // Setelah menerima permintaan, muat ulang riwayat percakapan dengan pengguna ini
+        // Jika pengguna yang diterima adalah selectedChatUser, maka fetch ulang chat history
+        const acceptedFriendship = incomingFriendRequests.find(req => req._id === friendshipId);
+        if (selectedChatUser && acceptedFriendship && selectedChatUser._id === acceptedFriendship.requester._id) {
+          fetchConversationHistory();
+        }
       } else {
         alert(data.message || 'Gagal menerima permintaan pertemanan.');
       }
@@ -820,7 +827,7 @@ export default function MessagesPage() {
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Hasil Pencarian ({usersFoundBySearch.length})</h2>
                 <div className="space-y-3">
-                  {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada pengguna ditemukan.</p>}
+                  {usersFoundBySearch.length === 0 && searchTerm.length > 2 && <p className="text-gray-500 text-sm">Tidak ada pengguna ditemukan untuk pencarian ini.</p>}
                   {usersFoundBySearch.map((user) => (
                     <div
                       key={user._id}
@@ -830,7 +837,7 @@ export default function MessagesPage() {
                       }`}
                     >
                       <div className="flex items-center gap-3 flex-grow min-w-0">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
                           {user.username.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-medium text-gray-800 truncate">{user.username}</span>
@@ -1010,10 +1017,9 @@ export default function MessagesPage() {
               <h2 className="text-lg font-semibold text-gray-800">Saran Pengguna</h2>
             </div>
             <div className="p-4 space-y-3">
-              {/* Logika tampilan saran pengguna yang diperbarui */}
               {suggestedUsers.length === 0 ? ( // Selalu tampilkan pesan ini jika suggestedUsers kosong
                 <p className="text-gray-500 text-sm">Tidak ada saran pengguna. Tambahkan teman untuk mendapatkan saran!</p>
-              ) : (
+              ) : ( // Jika ada suggestedUsers, tampilkan mereka
                 suggestedUsers.map((user) => (
                   <div
                     key={user._id}
@@ -1023,7 +1029,7 @@ export default function MessagesPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3 flex-grow min-w-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full flex items-center justify-center text-white text-sm">
                         {user.username.charAt(0).toUpperCase()}
                       </div>
                       <span className="font-medium text-gray-800 truncate">{user.username}</span>

@@ -1,7 +1,7 @@
-// backend/src/controllers/userController.ts
 import { Request, Response } from 'express';
 import User, { IUser } from '../models/User';
 import Friendship, { IFriendship } from '../models/Friendship';
+import Message from '../models/Message';
 import { Types } from 'mongoose';
 
 // Untuk mendapatkan ID pengguna dari request setelah otentikasi
@@ -96,6 +96,9 @@ export const acceptFriendRequest = async (req: AuthenticatedRequest, res: Respon
   const { friendshipId } = req.params;
   const userId = req.user?._id;
 
+  console.log('\n--- acceptFriendRequest dipanggil ---'); // Debug log
+  console.log('Friendship ID:', friendshipId, 'User ID yang menerima:', userId); // Debug log
+
   if (!userId) {
     return res.status(401).json({ message: 'Pengguna tidak terotentikasi.' });
   }
@@ -104,23 +107,43 @@ export const acceptFriendRequest = async (req: AuthenticatedRequest, res: Respon
     const friendship = await Friendship.findById(friendshipId);
 
     if (!friendship) {
+      console.log('Error: Permintaan pertemanan tidak ditemukan.'); // Debug log
       return res.status(404).json({ message: 'Permintaan pertemanan tidak ditemukan.' });
     }
+    console.log('Friendship ditemukan:', friendship); // Debug log
 
     if (!friendship.recipient.equals(userId as Types.ObjectId)) {
+      console.log('Error: User ID tidak cocok dengan recipient permintaan.'); // Debug log
       return res.status(403).json({ message: 'Anda tidak diizinkan untuk menerima permintaan ini.' });
     }
 
     if (friendship.status !== 'pending') {
+      console.log('Error: Permintaan pertemanan tidak dalam status pending. Status:', friendship.status); // Debug log
       return res.status(400).json({ message: 'Permintaan pertemanan tidak dalam status pending.' });
     }
 
     friendship.status = 'accepted';
     await friendship.save();
+    console.log('Status pertemanan diubah menjadi accepted.'); // Debug log
 
     // Tambahkan kedua pengguna ke daftar teman masing-masing
     await User.findByIdAndUpdate(friendship.requester, { $addToSet: { friends: friendship.recipient } });
     await User.findByIdAndUpdate(friendship.recipient, { $addToSet: { friends: friendship.requester } });
+    console.log('Pengguna ditambahkan ke daftar teman masing-masing.'); // Debug log
+
+    // Ubah status pesan permintaan menjadi normal ---
+    console.log('Mencoba mengupdate status pesan permintaan menjadi normal...'); // Debug log
+    const updateMessageResult = await Message.updateMany(
+      {
+        $or: [
+          { sender: friendship.requester, receiver: friendship.recipient },
+          { sender: friendship.recipient, receiver: friendship.requester }
+        ],
+        status: 'request'
+      },
+      { $set: { status: 'normal' } }
+    );
+    console.log('Hasil update pesan permintaan:', updateMessageResult); // Debug log
 
     res.status(200).json({ message: 'Permintaan pertemanan diterima.', friendship });
   } catch (err: unknown) {
@@ -271,7 +294,7 @@ export const getSuggestions = async (req: AuthenticatedRequest, res: Response) =
       if (suggestedUsers.length < 10) { // Targetkan hingga 10 saran
         const existingUserIds = new Set([...friendIds.map(id => id.toString()), ...suggestedUsers.map(u => u._id.toString())]);
         const otherUsers = await User.find({
-          _id: { $nin: Array.from(existingUserIds) } // Kecualikan yang sudah ada
+          _id: { $nin: Array.from(existingUserIds) }
         }).select('username _id').limit(10 - suggestedUsers.length);
         suggestedUsers = [...suggestedUsers, ...otherUsers];
       }
