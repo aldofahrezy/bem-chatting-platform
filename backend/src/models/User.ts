@@ -1,10 +1,12 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose'; // Import Types
 import bcrypt from 'bcryptjs';
 
 // Definisikan interface untuk dokumen User
 export interface IUser extends Document {
+  _id: Types.ObjectId; // Explicitly define _id as Types.ObjectId
   username: string;
   password: string;
+  friends: Types.ObjectId[]; // Menambahkan array untuk menyimpan ID teman
   // Menambahkan definisi untuk metode kustom
   comparePassword: (candidatePassword: string) => Promise<boolean>;
 }
@@ -13,6 +15,7 @@ export interface IUser extends Document {
 const UserSchema: Schema = new Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  friends: [{ type: Schema.Types.ObjectId, ref: 'User' }] // Referensi ke model User lain
 }, { timestamps: true }); // Menambahkan createdAt dan updatedAt secara otomatis
 
 // Middleware Mongoose untuk hashing password sebelum disimpan

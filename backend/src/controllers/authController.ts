@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import User, { IUser } from '../models/User';
-import bcrypt from 'bcryptjs';
 
 // Perluas antarmuka Request untuk menyertakan properti 'user'
 declare module 'express-serve-static-core' {

@@ -2,14 +2,15 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import authRoutes from './routes/authRoutes'; // Ensure this path is correct
-import messageRoutes from './routes/messageRoutes'; // Ensure this path is correct
+import authRoutes from './routes/authRoutes';
+import messageRoutes from './routes/messageRoutes';
+import userRoutes from './routes/userRoutes'; // Import user routes
 
 dotenv.config(); // Load environment variables
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || '';
+const PORT = process.env.PORT || 5001; // Menggunakan port 5001
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mydatabase';
 
 // Middleware
 app.use(cors()); // Enable CORS for all origins (adjust for production)
@@ -21,16 +22,13 @@ mongoose.connect(MONGODB_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
-// This basic route confirms Express is running
 app.get('/', (req, res) => {
   res.send('Backend API is running!');
 });
 
-// Mount the authentication routes
-app.use('/api/auth', authRoutes); // Ensure this base path matches your frontend calls
-
-// Mount the message routes
-app.use('/api/messages', messageRoutes); // Ensure this base path matches your frontend calls
+app.use('/api/auth', authRoutes); // Gunakan rute otentikasi
+app.use('/api/messages', messageRoutes); // Gunakan rute pesan
+app.use('/api/users', userRoutes); // Gunakan rute pengguna
 
 // Start the server
 app.listen(PORT, () => {

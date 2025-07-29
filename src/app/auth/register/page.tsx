@@ -60,7 +60,7 @@ export default function RegisterPage() {
         const errorData = data as ErrorData;
         setError(errorData.message || 'Pendaftaran gagal. Silakan coba lagi.');
       }
-    } catch (err: unknown) { // Mengubah 'any' menjadi 'unknown'
+    } catch (err: unknown) {
       console.error('Kesalahan saat mendaftar:', err);
       // Melakukan type narrowing untuk error yang bertipe unknown
       if (err instanceof Error) {
