@@ -29,9 +29,10 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
     // Check if they are already friends (status 'accepted')
     let friendship = await Friendship.findOne({
       $or: [
-        { requester: senderId, recipient: recipientUser._id, status: 'accepted' },
-        { requester: recipientUser._id, recipient: senderId, status: 'accepted' }
-      ]
+        { requester: senderId, recipient: recipientUser._id },
+        { requester: recipientUser._id, recipient: senderId }
+      ],
+      status: 'accepted'
     });
 
     let messageStatus: 'normal' | 'request' = 'normal';
@@ -40,8 +41,8 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
       // Scenario 1: Recipient replies to a message request (automatically accept friendship)
       // Find a pending friend request sent by the RECIPIENT (as requester) to the SENDER (as recipient)
       const pendingIncomingFriendship = await Friendship.findOne({
-        requester: recipientUser._id, // The user who sent the original friend request (i.e., current message recipient)
-        recipient: senderId,         // The user who received the original friend request (i.e., current message sender)
+        requester: recipientUser._id,
+        recipient: senderId,
         status: 'pending'
       });
 
@@ -60,9 +61,8 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
           { $set: { status: 'normal' } }
         );
 
-        friendship = pendingIncomingFriendship; // Set friendship so this message becomes normal
+        friendship = pendingIncomingFriendship;
         messageStatus = 'normal'; 
-
       } else {
         // Scenario 2: Current sender sends the first message to a non-friend (new message request)
         // Check if there's an existing pending outgoing request from the current sender to the recipient
@@ -80,7 +80,7 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
         });
 
         if (existingOutgoingPending || existingIncomingPending) {
-            messageStatus = 'request'; // Message remains a request if there's an existing pending request
+            messageStatus = 'request';
         } else {
             // This is the first message to a non-friend, create a new friend request
             const newFriendshipRequest: IFriendship = new Friendship({
@@ -89,7 +89,7 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
                 status: 'pending',
             });
             await newFriendshipRequest.save();
-            messageStatus = 'request'; // This first message is a request
+            messageStatus = 'request';
         }
       }
     } else {
@@ -100,7 +100,7 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
       sender: senderId,
       receiver: recipientUser._id,
       content: content,
-      status: messageStatus // Set message status
+      status: messageStatus
     });
 
     await newMessage.save();
@@ -116,7 +116,6 @@ export const createMessage = async (req: AuthenticatedRequest, res: Response) =>
 };
 
 // Read (R) - Get messages between two users (Friends only)
-// This endpoint is now only for 'normal' messages (friends)
 export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
   const { otherUsername } = req.query;
   const userId = req.user?._id;
@@ -136,7 +135,6 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
 
     const otherUserId = otherUser._id;
 
-    // Check if they are friends (important for this endpoint)
     const friendship = await Friendship.findOne({
       $or: [
         { requester: userId, recipient: otherUserId, status: 'accepted' },
@@ -153,7 +151,7 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
         { sender: userId, receiver: otherUserId },
         { sender: otherUserId, receiver: userId },
       ],
-      status: 'normal' // Only retrieve normal messages
+      status: 'normal'
     })
       .sort({ timestamp: 1 })
       .populate('sender', 'username')
@@ -226,9 +224,12 @@ export const getMessageRequests = async (req: AuthenticatedRequest, res: Respons
       status: 'request'
     })
       .sort({ timestamp: -1 })
-      .populate('sender', 'username');
+      .populate('sender', 'username'); // Populate the sender to get username
 
-    res.status(200).json(messageRequests);
+    // Filter out messages where sender is null (if populate failed)
+    const filteredMessageRequests = messageRequests.filter(msg => msg.sender !== null);
+
+    res.status(200).json(filteredMessageRequests);
   } catch (err: unknown) {
     if (err instanceof Error) {
       console.error('Kesalahan mendapatkan pesan permintaan:', err);
