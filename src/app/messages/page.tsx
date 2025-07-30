@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Check, X, Edit, Edit2 } from "lucide-react"
 import { useAuth } from '@/context/AuthContext';
+import AlertDialog from '@/components/AlertDialog';
+import toast from 'react-hot-toast';
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -143,6 +145,17 @@ export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<'chats' | 'requests' | 'search'>('chats');
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // State untuk alert dialog
+  const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false);
+  const [alertDialogContent, setAlertDialogContent] = useState({
+    title: '',
+    message: '',
+    confirmText: 'OK',
+    cancelText: 'Batal',
+    isConfirmDestructive: false,
+    onConfirm: () => {}, // Placeholder, akan diisi saat dialog dibuka
+  });
 
   // Fungsi untuk mendapatkan kredensial Basic Auth dari LocalStorage
   const getAuthHeader = useCallback(() => {
@@ -347,74 +360,84 @@ export default function MessagesPage() {
 
   // Handler untuk "Delete for me"
   const handleDeleteForMe = useCallback(async (messageId: string) => {
-    const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus pesan ini hanya untuk Anda?");
-    if (!confirmDelete) {
-      return;
-    }
+    setAlertDialogContent({
+      title: 'Hapus Pesan',
+      message: 'Apakah Anda yakin ingin menghapus pesan ini hanya untuk Anda? Pesan ini akan hilang dari riwayat chat Anda.',
+      confirmText: 'Hapus untuk saya',
+      cancelText: 'Batal',
+      isConfirmDestructive: true,
+      onConfirm: async () => {
+        try {
+          const authHeader = getAuthHeader();
+          const response = await fetch(`http://localhost:5001/api/messages/${messageId}/delete-for-me`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+          });
 
-    try {
-      const authHeader = getAuthHeader();
-      const response = await fetch(`http://localhost:5001/api/messages/${messageId}/delete-for-me`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({})
-      });
-
-      if (response.ok) {
-        // Optmistic update for delete for me
-        setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
-        fetchFriends(); // Perbarui daftar teman untuk mendapatkan pesan terakhir
-        fetchMessageRequests(); // Perbarui pesan permintaan jika perlu
-        fetchSuggestedUsers(); // Perbarui saran pengguna
-        alert('Pesan berhasil dihapus untuk Anda.');
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Gagal menghapus pesan untuk Anda.');
-      }
-    } catch (error: unknown) {
-      console.error("Kesalahan menghapus pesan untuk saya:", error);
-      alert('Terjadi kesalahan jaringan saat menghapus pesan untuk Anda.');
-    }
-  }, [fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]); // Hapus fetchConversationHistory dari dependensi karena optimistik update
+          if (response.ok) {
+            setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
+            fetchFriends();
+            fetchMessageRequests();
+            fetchSuggestedUsers();
+            toast.success('Pesan berhasil dihapus untuk Anda.');
+          } else {
+            const errorData = await response.json();
+            toast.error(errorData.message || 'Gagal menghapus pesan untuk Anda.'); // Fallback to toast for errors
+          }
+        } catch (error: unknown) {
+          console.error("Kesalahan menghapus pesan untuk saya:", error);
+          toast.error('Terjadi kesalahan jaringan saat menghapus pesan untuk Anda.'); // Fallback to toast for errors
+        }
+      },
+    });
+    setIsAlertDialogOpen(true);
+  }, [fetchFriends, fetchMessageRequests, fetchSuggestedUsers, getAuthHeader]);
 
   // Handler untuk "Unsend message" (menghapus dari database untuk semua)
   const handleUnsendMessage = async (messageId: string) => {
     if (!currentUserId) {
-      alert("Anda belum login.");
+      toast.error("Anda belum login.");
       return;
     }
-    const confirmUnsend = window.confirm("Apakah Anda yakin ingin membatalkan pengiriman pesan ini? Ini akan menghapus pesan untuk kedua belah pihak.");
-    if (!confirmUnsend) {
-      return;
-    }
+    setAlertDialogContent({
+      title: 'Batalkan Pengiriman Pesan',
+      message: 'Apakah Anda yakin ingin membatalkan pengiriman pesan ini? Pesan ini akan dihapus untuk Anda dan penerima.',
+      confirmText: 'Batalkan Kirim',
+      cancelText: 'Batal',
+      isConfirmDestructive: true,
+      onConfirm: async () => { // Aksi konfirmasi akan dieksekusi di sini
+        try {
+          const authHeader = getAuthHeader();
+          const response = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': authHeader,
+            },
+          });
 
-    try {
-      const authHeader = getAuthHeader();
-      const response = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': authHeader,
-        },
-      });
-
-      if (response.ok) {
-        alert('Pesan berhasil dibatalkan pengiriman.');
-        fetchFriends();
-        fetchFriendRequests();
-        fetchMessageRequests();
-        fetchSuggestedUsers();
-        fetchConversationHistory(); // Memuat ulang riwayat percakapan
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Gagal membatalkan pengiriman pesan.');
-      }
-    } catch (error: unknown) {
-      console.error("Kesalahan membatalkan pengiriman pesan:", error);
-      alert('Terjadi kesalahan jaringan saat membatalkan pengiriman pesan.');
-    }
+          if (response.ok) {
+            toast.success('Pengiriman pesan berhasil dibatalkan.');
+            setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId)); // Atau tandai sebagai 'dibatalkan'
+            fetchFriends();
+            fetchFriendRequests();
+            fetchMessageRequests();
+            fetchSuggestedUsers();
+            fetchConversationHistory();
+          } else {
+            const errorData = await response.json();
+            toast.error(errorData.message || 'Gagal membatalkan pengiriman pesan.'); // Fallback to toast for errors
+          }
+        } catch (error: unknown) {
+          console.error("Kesalahan membatalkan pengiriman pesan:", error);
+          toast.error('Terjadi kesalahan jaringan saat membatalkan pengiriman pesan.'); // Fallback to toast for errors
+        }
+      },
+    });
+    setIsAlertDialogOpen(true);
   };
 
 
@@ -601,15 +624,15 @@ export default function MessagesPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        alert(data.message);
+        toast.success(data.message || 'Permintaan pertemanan berhasil dikirim.');
         fetchFriendRequests();
         fetchSuggestedUsers();
       } else {
-        alert(data.message || 'Gagal mengirim permintaan pertemanan.');
+        toast.error(data.message || 'Gagal mengirim permintaan pertemanan.');
       }
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat mengirim permintaan pertemanan:', error);
-      alert('Terjadi kesalahan jaringan saat mengirim permintaan pertemanan.');
+      toast.error('Terjadi kesalahan jaringan saat mengirim permintaan pertemanan.');
     }
   };
 
@@ -623,7 +646,7 @@ export default function MessagesPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        alert(data.message);
+        toast.success(data.message || 'Permintaan pertemanan diterima.');
         fetchFriendRequests();
         fetchFriends();
         fetchSuggestedUsers();
@@ -635,11 +658,11 @@ export default function MessagesPage() {
           fetchConversationHistory();
         }
       } else {
-        alert(data.message || 'Gagal menerima permintaan pertemanan.');
+        toast.error(data.message || 'Gagal menerima permintaan pertemanan.');
       }
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat menerima permintaan pertemanan:', error);
-      alert('Terjadi kesalahan jaringan saat menerima permintaan pertemanan.');
+      toast.error('Terjadi kesalahan jaringan saat menerima permintaan pertemanan.');
     }
   };
 
@@ -653,15 +676,15 @@ export default function MessagesPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        alert(data.message);
+        toast.success(data.message || 'Permintaan pertemanan berhasil ditolak.');
         fetchFriendRequests();
         fetchSuggestedUsers();
       } else {
-        alert(data.message || 'Gagal menolak permintaan pertemanan.');
+        toast.error(data.message || 'Gagal menolak permintaan pertemanan.');
       }
     } catch (error: unknown) {
       console.error('Kesalahan jaringan saat menolak permintaan pertemanan:', error);
-      alert('Terjadi kesalahan jaringan saat menolak permintaan pertemanan.');
+      toast.error('Terjadi kesalahan jaringan saat menolak permintaan pertemanan.');
     }
   };
 
@@ -1120,6 +1143,17 @@ export default function MessagesPage() {
           </div>
         </div>
       </div>
+      {/* --- RENDER CUSTOM ALERT DIALOG --- */}
+      <AlertDialog
+        isOpen={isAlertDialogOpen}
+        onClose={() => setIsAlertDialogOpen(false)}
+        title={alertDialogContent.title}
+        message={alertDialogContent.message}
+        confirmText={alertDialogContent.confirmText}
+        cancelText={alertDialogContent.cancelText}
+        isConfirmDestructive={alertDialogContent.isConfirmDestructive}
+        onConfirm={alertDialogContent.onConfirm}
+      />
     </div>
   )
 }

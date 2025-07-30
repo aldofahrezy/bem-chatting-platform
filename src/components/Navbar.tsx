@@ -17,7 +17,7 @@ const Navbar: React.FC = () => {
         </Link>
         {isLoggedIn && (
           <Link href="/messages" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
-            Messages
+            Pesan
           </Link>
         )}
         <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
