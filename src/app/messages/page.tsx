@@ -6,6 +6,7 @@ import { Search, Phone, Video, MoreHorizontal, Send, Users, Bell, UserPlus, Chec
 import { useAuth } from '@/context/AuthContext';
 import AlertDialog from '@/components/AlertDialog';
 import toast from 'react-hot-toast';
+import { BASE_API_URL } from '@/utils/constants';
 
 // Komponen untuk menampilkan satu pesan
 interface MessageProps {
@@ -171,7 +172,7 @@ export default function MessagesPage() {
     if (!currentUserId || !isLoggedIn) return; // Pastikan currentUserId dan isLoggedIn ada
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch('http://localhost:5001/api/users/friends', {
+      const response = await fetch(`${BASE_API_URL}/api/users/friends`, {
         headers: { Authorization: authHeader }
       });
       
@@ -180,7 +181,7 @@ export default function MessagesPage() {
         const friendsWithMessages: FriendWithLastMessage[] = await Promise.all(
           friendList.map(async (friend) => {
             try {
-              const msgResponse = await fetch(`http://localhost:5001/api/messages/history?otherUsername=${friend.username}`, {
+              const msgResponse = await fetch(`${BASE_API_URL}/api/messages/history?otherUsername=${friend.username}`, {
                 headers: { Authorization: authHeader }
               });
               const msgs: MessageProps[] = await msgResponse.json();
@@ -215,7 +216,7 @@ export default function MessagesPage() {
     if (!currentUserId || !isLoggedIn) return;
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch('http://localhost:5001/api/users/friend-requests/pending', {
+      const response = await fetch(`${BASE_API_URL}/api/users/friend-requests/pending`, {
         headers: { Authorization: authHeader }
       });
       const data = await response.json();
@@ -239,7 +240,7 @@ export default function MessagesPage() {
     if (!currentUserId || !isLoggedIn) return;
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch('http://localhost:5001/api/messages/requests', {
+      const response = await fetch(`${BASE_API_URL}/api/messages/requests`, {
         headers: { Authorization: authHeader }
       });
       const data = await response.json();
@@ -262,7 +263,7 @@ export default function MessagesPage() {
     if (!currentUserId || !isLoggedIn) return;
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch('http://localhost:5001/api/users/suggestions', {
+      const response = await fetch(`${BASE_API_URL}/api/users/suggestions`, {
         headers: { Authorization: authHeader }
       });
       const data = await response.json();
@@ -323,7 +324,7 @@ export default function MessagesPage() {
     setError(null);
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch(`http://localhost:5001/api/messages/history?otherUsername=${selectedChatUser.username}`, {
+      const response = await fetch(`${BASE_API_URL}/api/messages/history?otherUsername=${selectedChatUser.username}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -369,7 +370,7 @@ export default function MessagesPage() {
       onConfirm: async () => {
         try {
           const authHeader = getAuthHeader();
-          const response = await fetch(`http://localhost:5001/api/messages/${messageId}/delete-for-me`, {
+          const response = await fetch(`${BASE_API_URL}/api/messages/${messageId}/delete-for-me`, {
             method: 'PUT',
             headers: {
               'Authorization': authHeader,
@@ -412,7 +413,7 @@ export default function MessagesPage() {
       onConfirm: async () => { // Aksi konfirmasi akan dieksekusi di sini
         try {
           const authHeader = getAuthHeader();
-          const response = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+          const response = await fetch(`${BASE_API_URL}/api/messages/${messageId}`, {
             method: 'DELETE',
             headers: {
               'Authorization': authHeader,
@@ -459,7 +460,7 @@ export default function MessagesPage() {
     if (editingMessage) {
       // Logic for editing an existing message
       try {
-        const response = await fetch(`http://localhost:5001/api/messages/${editingMessage._id}`, {
+        const response = await fetch(`${BASE_API_URL}/api/messages/${editingMessage._id}`, {
           method: "PUT", // Use PUT for updating
           headers: {
             "Content-Type": "application/json",
@@ -510,7 +511,7 @@ export default function MessagesPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:5001/api/messages", {
+        const response = await fetch(`${BASE_API_URL}/api/messages`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -582,7 +583,7 @@ export default function MessagesPage() {
     if (term.length > 2) {
       try {
         const authHeader = getAuthHeader();
-        const response = await fetch(`http://localhost:5001/api/users/search?username=${term}`, {
+        const response = await fetch(`${BASE_API_URL}/api/users/search?username=${term}`, {
           headers: { Authorization: authHeader }
         });
         const data = await response.json();
@@ -614,7 +615,7 @@ export default function MessagesPage() {
   const handleSendFriendRequest = async (recipientUsername: string) => {
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch('http://localhost:5001/api/users/friend-request', {
+      const response = await fetch(`${BASE_API_URL}/api/users/friend-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -640,7 +641,7 @@ export default function MessagesPage() {
   const handleAcceptFriendRequest = async (friendshipId: string) => {
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch(`http://localhost:5001/api/users/friend-request/${friendshipId}/accept`, {
+      const response = await fetch(`${BASE_API_URL}/api/users/friend-request/${friendshipId}/accept`, {
         method: 'PUT',
         headers: { Authorization: authHeader }
       });
@@ -670,7 +671,7 @@ export default function MessagesPage() {
   const handleRejectFriendRequest = async (friendshipId: string) => {
     try {
       const authHeader = getAuthHeader();
-      const response = await fetch(`http://localhost:5001/api/users/friend-request/${friendshipId}/reject`, {
+      const response = await fetch(`${BASE_API_URL}/api/users/friend-request/${friendshipId}/reject`, {
         method: 'PUT',
         headers: { Authorization: authHeader }
       });

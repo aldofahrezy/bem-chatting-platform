@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BEM Chatting Platform
+
+A real-time chatting platform built for BEM (Student Executive Board) organizations to facilitate communication and collaboration.
+
+## Features
+
+- Real-time Chatting: Kirim dan terima pesan secara instan antar anggota BEM.
+- Friendship Management: Tambah teman, kirim/terima/tolak permintaan pertemanan.
+- Message Requests: Kelola pesan dari non-teman sebagai permintaan pesan.
+- User Search: Cari anggota BEM lain dengan mudah.
+- Message Editing: Edit pesan yang sudah terkirim (ditandai dengan "Diedit").
+- Message Deletion: Hapus pesan untuk diri sendiri ("Delete for me") atau batalkan pengiriman ("Unsend") untuk kedua belah pihak.
+- Authentication: Sistem login dan registrasi pengguna yang aman.
+- Persistent Navbar: Navbar yang selalu terlihat di seluruh halaman utama.
+- Responsive UI: Desain yang adaptif untuk berbagai ukuran layar (mobile, tablet, desktop).
+- Notifications & Suggestions: Notifikasi permintaan pertemanan dan saran pengguna di sidebar.
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository:
+  ```bash
+  git clone https://github.com/aldofahrezy/bem-chatting-platform.git
+  cd bem-chatting-app
+  ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+2.  **Setup MongoDB Database:**
+    This application requires a MongoDB database. You can either run MongoDB locally or use a cloud service like MongoDB Atlas. Ensure you have your MongoDB connection URI (e.g., `mongodb://localhost:27017/bemchat` or your Atlas URI).
+  
+3.  **Install Dependencies & Configure Environment Variables:**
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+    * **Backend:**
+        Navigate to the `backend` directory, install dependencies, and create a `.env` file.
+        ```bash
+        cd backend
+        npm install # or yarn install
+        ```
+        Create a `.env` file in your `backend/` directory based on `backend/.env.example` with the following content:
+        ```
+        MONGODB_URI=<Your MongoDB Connection URI>
+        PORT=5001
+        ```
+        Replace the placeholders with your actual values.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+    * **Frontend:**
+        Navigate back to the project's root directory, install dependencies, and create a `.env.local` file.
+        ```bash
+        cd .. # Go back to the project root directory
+        npm install # or yarn install
+        ```
+        Create a `.env.local` file in your project's root directory based on `.env.example` with the following content:
+        ```
+        NEXT_PUBLIC_BACKEND_URL=http://localhost:5001 # Adjust to your local backend URL
+        ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4.  **Run the Application:**
 
-## Learn More
+    * **Start Backend:**
+        In your terminal, ensure you are in the `backend` directory, then run:
+        ```bash
+        npm run dev # or npm start
+        ```
 
-To learn more about Next.js, take a look at the following resources:
+    * **Start Frontend:**
+        Open a new terminal, ensure you are in the project's root directory, then run:
+        ```bash
+        npm run dev # or yarn dev
+        ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    The frontend application will be running at `http://localhost:3000`. Open your browser and access this URL to view the application.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Contributing
 
-## Deploy on Vercel
+Contributions are welcome! Please open issues or submit pull requests for improvements.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the MIT License.
+
+---
