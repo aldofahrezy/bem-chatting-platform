@@ -72,7 +72,8 @@ export const registerUser = async (req: Request, res: Response) => {
     const newUser: IUser = new User({ username, password });
     await newUser.save();
 
-    res.status(201).json({ message: 'Pengguna berhasil terdaftar!', userId: newUser._id });
+    res.status(201).json({ message: 'Pengguna berhasil terdaftar!', userId: newUser._id, username: newUser.username });
+
   } catch (err: unknown) {
     if (err instanceof Error) {
       console.error('Kesalahan registrasi pengguna:', err);
