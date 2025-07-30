@@ -20,10 +20,10 @@ const Navbar: React.FC = () => {
             Pesan
           </Link>
         )}
-        <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
+        <Link href="/#fitur-section" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
           Fitur
         </Link>
-        <Link href="#" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
+        <Link href="/#tentang-kami-section" className="text-lg font-medium text-gray-700 hover:text-blue-600 transition duration-300">
           Tentang Kami
         </Link>
         {isLoggedIn ? (

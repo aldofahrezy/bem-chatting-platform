@@ -39,7 +39,7 @@ export default function Home() {
       </section>
 
       {/* Keunggulan Layanan (Features Section) */}
-      <section className="py-20 px-6 md:px-12 bg-white rounded-t-xl shadow-inner">
+      <section id="fitur-section" className="py-20 px-6 md:px-12 bg-white rounded-t-xl shadow-inner">
         <h2 className="text-5xl font-extrabold text-center text-blue-800 mb-16">
           Mengapa BEM Chatting?
         </h2>
@@ -73,7 +73,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer (Optional, but good practice) */}
+      {/* Tentang Kami */}
+      <section id="tentang-kami-section" className="py-20 px-6 md:px-12 bg-gray-100 shadow-inner"> {/* <--- BAGIAN BARU */}
+        <h2 className="text-5xl font-extrabold text-center text-blue-800 mb-16">
+          Tentang Kami
+        </h2>
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-lg md:text-xl text-gray-700 mb-8">
+            BEM Chatting adalah inisiatif dari Badan Eksekutif Mahasiswa (BEM) untuk memfasilitasi komunikasi yang lebih efektif dan efisien di antara para anggotanya. Kami percaya bahwa komunikasi yang baik adalah kunci keberhasilan setiap organisasi, dan melalui platform ini, kami berharap dapat mempererat tali silaturahmi serta meningkatkan produktivitas seluruh elemen BEM.
+          </p>
+          <p className="text-lg md:text-xl text-gray-700">
+            Platform ini dirancang khusus untuk memenuhi kebutuhan koordinasi, berbagi informasi, dan kolaborasi yang dinamis di lingkungan kampus. Mari kita bangun komunikasi yang kuat dan bergerak maju bersama!
+          </p>
+        </div>
+      </section>
+
+      {/* Footer */}
       <footer className="py-8 bg-gray-800 text-white text-center text-sm">
         <p>&copy; 2025 BEM Chatting. All rights reserved.</p>
       </footer>
